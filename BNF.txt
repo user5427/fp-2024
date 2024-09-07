@@ -1,0 +1,25 @@
+<command> ::= <add-book> | <remove-book> | <list-books> | <create-collection> | <add-to-collection> | <remove-from-collection> | <list-collection>
+
+<add-book> ::= "add-book" <title> <author> <genre> <year>
+
+<remove-book> ::= "remove-book" <title>
+
+<list-books> ::= "list-books"
+
+<create-collection> ::= "create-collection" <name> <description>
+ 
+<add-to-collection> ::= "add-to-collection" <collection-name> <title>
+
+<remove-from-collection> ::= "remove-from-collection" <collection-name> <title>
+
+<list-collection> ::= "list-collection" <collection-name>
+
+<title> ::= <string>
+<author> ::= <string>
+<genre> ::= <string>
+<year> ::= <integer>
+<name> ::= <string>
+<description> ::= <string>
+<collection-name> ::= <string>
+<string> ::= <any sequence of characters>
+<integer> ::= <positive whole number>
