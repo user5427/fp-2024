@@ -1,18 +1,22 @@
-<command> ::= <add-book> | <remove-book> | <list-books> | <create-collection> | <add-to-collection> | <remove-from-collection> | <list-collection>
+<command> ::= <add_book> | <remove_book> | <list_books> | <create_collection> | <remove_collection> | <add_to_collection> | <remove_from_collection> | <list_collection> | <combine_collections>
 
-<add-book> ::= "add-book" <title> <author> <genre> <year>
+<add_book> ::= "add_book" <title> <author> <genre> <year>
 
-<remove-book> ::= "remove-book" <title>
+<remove_book> ::= "remove_book" <title>
 
-<list-books> ::= "list-books"
+<list_books> ::= "list_books"
 
-<create-collection> ::= "create-collection" <name> <description>
+<create_collection> ::= "create_collection" <name> <description>
+
+<remove_collection> ::= "remove_collection" <name>
  
-<add-to-collection> ::= "add-to-collection" <collection-name> <title>
+<add_to_collection> ::= "add_to_collection" <collection_name> <title>
 
-<remove-from-collection> ::= "remove-from-collection" <collection-name> <title>
+<remove_from_collection> ::= "remove_from_collection" <collection_name> <title>
 
-<list-collection> ::= "list-collection" <collection-name>
+<combine_collections> ::= "combine_collections" <collection_name> <collection_name>
+
+<list_collection> ::= "list_collection" <collection_name>
 
 <title> ::= <string>
 <author> ::= <string>
@@ -20,6 +24,6 @@
 <year> ::= <integer>
 <name> ::= <string>
 <description> ::= <string>
-<collection-name> ::= <string>
-<string> ::= <any sequence of characters>
-<integer> ::= <positive whole number>
+<collection_name> ::= <string>
+<string> ::= "[a-zA-Z0-9_ ]+"
+<integer> ::= "[0-9]+"

@@ -6,23 +6,27 @@
   * author
   * genre
   * year
-* Authors
-* Readers
+  
+* Collections
+  * name
+  * description
+  * books
+  * other collections
 
 **Main operations:**
-* Add/remove book (add-book, remove-book)
-* Create book collection (create-collection, )
-* Add/remove book to/from collection (add-to-collection, remove-from-collection)
-* List books/collections (list-books, list-collection)
-
-Examples:
-* add-book "Logika ir dirbtinis intelektas" "S. Norgėla" "Matematinė logika" "2007"
-* create-collection "Matematinės logikos knygos" "Knygos apie logiką".
-* add-to-collection "Matematinės logikos knygos" "Matematinė logika"
+* Add/remove book (add_book, remove_book)
+* Create/remove book collection (create_collection, remove_collection)
+* Add/remove book to/from collection (add_to_collection, remove_from_collection)
+* List books/collections (list_books, list_collection)
+* Add second collection to the first collection (combine_collections)
 <!-- (is the last option recursive?) -->
 
 Examples:
-
+* add_book "Logika ir dirbtinis intelektas" "S. Norgėla" "Matematinė logika" "2007"
+* create_collection "Matematinės logikos knygos" "Knygos apie logiką"
+* add_to_collection "Matematinės logikos knygos" "Matematinė logika"
+* create_collection "Matematika" "Visos knygos susiejusios su matematika"
+* combine_collections "Matematika" "Matematinės logikos knygos"
 
 **repl's grammar (BNF):**
 
