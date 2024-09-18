@@ -10,10 +10,10 @@
 <add_bus> ::= "add_bus" <bus_id> <bus_park> <bus_working_start_time> <bus_working_end_time>
 <remove_bus> ::= "remove_bus" <bus_id>
 <add_train> ::= "add_train" <train_id> <train_yard> <train_working_start_time> <train_working_end_time>
-<remove_train> ::= "remove_train> <train_id>
-<add_bus_stop> ::= "add_bus_stop" <stop_id> <name> <coord-x> <coord-y>
+<remove_train> ::= "remove_train" <train_id>
+<add_bus_stop> ::= "add_bus_stop" <stop_id> <name> <coord_x> <coord_y>
 <remove_bus_stop> ::= "remove_bus_stop" <stop_id>
-<add_train_stop> ::= "add_train_stop" <stop_id> <name> <coord-x> <coord-y>
+<add_train_stop> ::= "add_train_stop" <stop_id> <name> <coord_x> <coord_y>
 <remove_train_stop> ::= "remove_train_stop" <stop_id>
 
 <create_route> ::= "create_route" <route_id> <route_name>
@@ -49,8 +49,8 @@
 <train_working_end_time> ::= <string>
 <stop_id> ::= <integer>
 <name> ::= <string>
-<coord-x> ::= <float>
-<coord-y> ::= <float>
+<coord_x> ::= <float>
+<coord_y> ::= <float>
 <route_id> ::= <integer>
 <route_name> ::= <string>
 <path_id> ::= <integer>
