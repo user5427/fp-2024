@@ -35,8 +35,9 @@
 <join_two_routes> ::= "join_two_routes" <route_id> <route_id> <route_id> <route_name>
 <join_two_routes_at_stop> ::= "join_two_routes" <route_id> <route_id> <stop_id> <route_id> <route_name>
 
-<create_path> ::= "create_path" <path_id> <name> <stop_id> <stop_id>
+<create_path> ::= "create_path" <path_id> <name> <path_length> <stop_id> <stop_id>
 <remove_path> ::= "remove_path" <path_id>
+
 
 <bus_id> ::= <integer>
 <bus_park> ::= <string>
@@ -53,6 +54,7 @@
 <route_id> ::= <integer>
 <route_name> ::= <string>
 <path_id> ::= <integer>
+<path_length> ::= <float>
 <float> ::= "[+-]?[0-9]+([.][0-9]+)?"
 <string> ::= "[a-zA-Z0-9_ ]+"
 <integer> ::= "[0-9]+"

@@ -37,6 +37,15 @@
 - Join two routes at the intersecting stop (creates a new route)
 - Join two routes at the provided stop (creates a new route)
 
+<!-- - Create a trip
+- Add paths to trip
+- Add route to trip
+- Remove trip -->
+
+ <!-- got a little too complicated/overengineered -->
+<!-- | <create_trip> | <remove_trip> -->
+<!-- <create_trip> ::= "create_trip" <trip_id> <start-coord-x> <start-coord-y> <end-coord-x> <end-coord-y> -->
+
 Yes the same route will be able to have both busses and trains operating.
 
 **Examples:**
@@ -116,7 +125,7 @@ create_route 501 "City Center Loop"
 
 16. **Create a public path between two stops**  
  ```
- create_path 701 "Scenic Path" 301 401
+ create_path 701 "Scenic Path" 11 301 401
  ```
 
 17. **Remove a public path**  
