@@ -14,6 +14,7 @@
 **Main entities:**
 - Busses
 - Trains
+- Stops
 - Bus routes
 - Train routes
 - Public paths
