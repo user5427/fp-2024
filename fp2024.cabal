@@ -1,4 +1,3 @@
-
 cabal-version: 2.2
 
 -- This file has been generated from package.yaml by hpack version 0.36.0.
@@ -27,6 +26,7 @@ source-repository head
 library
   exposed-modules:
       Lessons.Lesson01
+      Lessons.Lesson02
       Lib1
   other-modules:
       Paths_fp2024
