@@ -5,39 +5,50 @@
 <print_all_routes> | <print_all_busses> | <print_all_trains> |
 <print_all_route_busses> | <print_all_route_trains> |
 <join_two_routes> | <join_two_routes_at_stop> | 
-<create_path> | <remove_path>
+<create_path> | <remove_path> | 
+<create_trip> | <add_paths_to_trip> | <remove_paths_from_trip> | <add_stops_to_trip> | <remove_stops_from_trip> | <remove_trip> | <join_two_trips> | <print_all_trips> | <trip_valid>
 
-<add_bus> ::= "add_bus" <bus_id> <bus_park> <bus_working_start_time> <bus_working_end_time>
-<remove_bus> ::= "remove_bus" <bus_id>
-<add_train> ::= "add_train" <train_id> <train_yard> <train_working_start_time> <train_working_end_time>
-<remove_train> ::= "remove_train" <train_id>
-<add_bus_stop> ::= "add_bus_stop" <stop_id> <name> <coord_x> <coord_y>
-<remove_bus_stop> ::= "remove_bus_stop" <stop_id>
-<add_train_stop> ::= "add_train_stop" <stop_id> <name> <coord_x> <coord_y>
-<remove_train_stop> ::= "remove_train_stop" <stop_id>
+<add_bus> ::= "add_bus" " " <bus_id> " " <bus_park> " " <bus_working_start_time> " " <bus_working_end_time>
+<remove_bus> ::= "remove_bus" " " <bus_id>
+<add_train> ::= "add_train" " " <train_id> " " <train_yard> " " <train_working_start_time> " " <train_working_end_time>
+<remove_train> ::= "remove_train" " " <train_id>
+<add_bus_stop> ::= "add_bus_stop" " " <stop_id> " " <name> " " <coord_x> " " <coord_y>
+<remove_bus_stop> ::= "remove_bus_stop" " " <stop_id>
+<add_train_stop> ::= "add_train_stop" " " <stop_id> " " <name> " " <coord_x> " " <coord_y>
+<remove_train_stop> ::= "remove_train_stop" " " <stop_id>
 
-<create_route> ::= "create_route" <route_id> <route_name>
-<assign_bus_to_route> ::= "assign_bus_to_route" <bus_id> <route_id>
-<assign_train_to_route> ::= "assign_train_to_route" <train_id> <route_id>
-<remove_bus_from_route> ::= "remove_bus_from_route" <bus_id> <route_id>
-<remove_train_from_route> ::= "remove_train_from_route" <train_id> <route_id>
-<add_bus_stop_to_route> ::= "add_bus_stop_to_route" <stop_id> <route_id>
-<remove_bus_stop_from_route> ::= "remove_bus_stop_from_route" <stop_id> <route_id>
-<add_train_stop_to_route> ::= "add_train_stop_to_route" <stop_id> <route_id>
-<remove_train_stop_from_route> ::= "remove_train_stop_from_route" <stop_id> <route_id>
+
+<create_route> ::= "create_route" " " <route_id> " " <route_name>
+<assign_bus_to_route> ::= "assign_bus_to_route" " " <bus_id> " " <route_id>
+<assign_train_to_route> ::= "assign_train_to_route" " " <train_id> " " <route_id>
+<remove_bus_from_route> ::= "remove_bus_from_route" " " <bus_id> " " <route_id>
+<remove_train_from_route> ::= "remove_train_from_route" " " <train_id> " " <route_id>
+<add_bus_stop_to_route> ::= "add_bus_stop_to_route" " " <stop_id> " " <route_id>
+<remove_bus_stop_from_route> ::= "remove_bus_stop_from_route" " " <stop_id> " " <route_id>
+<add_train_stop_to_route> ::= "add_train_stop_to_route" " " <stop_id> " " <route_id>
+<remove_train_stop_from_route> ::= "remove_train_stop_from_route" " " <stop_id> " " <route_id>
 
 <print_all_routes> ::= "print_all_routes"
 <print_all_busses> ::= "print_all_busses"
 <print_all_trains> ::= "print_all_trains"
-<print_all_route_busses> ::= "print_all_route_busses" <route_id>
-<print_all_route_trains> ::= "print_all_route_trains" <route_id>
+<print_all_route_busses> ::= "print_all_route_busses" " " <route_id>
+<print_all_route_trains> ::= "print_all_route_trains" " " <route_id>
 
-<join_two_routes> ::= "join_two_routes" <route_id> <route_id> <route_id> <route_name>
-<join_two_routes_at_stop> ::= "join_two_routes" <route_id> <route_id> <stop_id> <route_id> <route_name>
+<join_two_routes> ::= "join_two_routes" " " <route_id> " " <new_route_id> " " <route_id> " " <route_name>
+<join_two_routes_at_stop> ::= "join_two_routes_at_stop" " " <route_id> " " <route_id> " " <stop_id> " " <new_route_id> " " <route_name>
 
-<create_path> ::= "create_path" <path_id> <name> <path_length> <stop_id> <stop_id>
-<remove_path> ::= "remove_path" <path_id>
+<create_path> ::= "create_path" " " <path_id> " " <name> " " <path_length> " " <stop_id> " " <stop_id>
+<remove_path> ::= "remove_path" " " <path_id>
 
+<create_trip> ::= "create_trip" " " <trip_id> " " <trip_name>
+<add_paths_to_trip> ::= "add_paths_to_trip" " " <trip_id> " " <path_id>
+<remove_paths_from_trip> ::= "remove_paths_from_trip" " " <trip_id> " " <path_id>
+<add_stops_to_trip> ::= "add_stops_to_trip" " " <trip_id> " " <stop_id>
+<remove_stops_from_trip> ::= "remove_stops_from_trip" " " <trip_id> " " <stop_id>
+<remove_trip> ::= "remove_trip" " " <trip_id>
+<join_two_trips> ::= "join_two_trips" " " <trip_id> " " <trip_id> " " <new_trip_id> " " <name>
+<print_all_trips> ::= "print_all_trips"
+<trip_valid> ::= "trip_valid" " " <trip_id> 
 
 <bus_id> ::= <integer>
 <bus_park> ::= <string>
@@ -55,6 +66,17 @@
 <route_name> ::= <string>
 <path_id> ::= <integer>
 <path_length> ::= <float>
-<float> ::= "[+-]?[0-9]+([.][0-9]+)?"
-<string> ::= "[a-zA-Z0-9_ ]+"
-<integer> ::= "[0-9]+"
+<trip_id> ::= <integer>
+<new_trip_id> ::= <integer>
+<new_route_id> ::= <integer>
+<trip_name> ::= <string>
+<float> ::= <pos> | <neg>
+<string> ::= <text>
+<integer> ::= [0-9]+
+<pos> ::= ("0" |  [1-9] [0-9]*) ("." [0-9]+ )?
+<neg> ::= "-" <pos>
+
+<text> ::= <character> <text> | <character>
+<character> ::= <letter> | <digit>
+<letter> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" | ":" | "_"
+<digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"

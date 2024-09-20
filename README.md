@@ -11,6 +11,9 @@
 2. `stack test`
 
 ## Domain - Public transport and routes
+
+Program aim - check if given trip is valid (It is all connected)
+
 **Main entities:**
 - Busses
 - Trains
@@ -37,21 +40,22 @@
 - Join two routes at the intersecting stop (creates a new route)
 - Join two routes at the provided stop (creates a new route)
 
-<!-- - Create a trip
-- Add paths to trip
-- Add route to trip
-- Remove trip -->
-
- <!-- got a little too complicated/overengineered -->
-<!-- | <create_trip> | <remove_trip> -->
-<!-- <create_trip> ::= "create_trip" <trip_id> <start-coord-x> <start-coord-y> <end-coord-x> <end-coord-y> -->
+- Create a trip
+- Add paths to the trip
+- Remove paths from the trip
+- Add route stops to the trip
+- Remove route stops from the trip
+- Remove trip
+- Join two trips to create a new trip
+- Print all trips
+- Check if trip is valid
 
 Yes the same route will be able to have both busses and trains operating.
 
 **Examples:**
 1. **Add a bus to the system**  
 ```
-add_bus 101 "Central Park" "06:00" "18:00"
+add_bus 101 Central_Park 06:00 18:00
 ```
 
 2. **Remove a bus from the system**  
@@ -61,7 +65,7 @@ remove_bus 101
 
 3. **Add a train to the system**  
 ```
-add_train 201 "Main Yard" "05:00" "22:00"
+add_train 201 Main_Yard 05:00 22:00
 ```
 
 4. **Remove a train from the system**  
@@ -71,7 +75,7 @@ remove_train 201
 
 5. **Add a bus stop**  
 ```
-add_bus_stop 301 "Downtown" 40.7128 -74.0060
+add_bus_stop 301 Downtown 40.7128 -74.0060
 ```
 
 6. **Remove a bus stop**  
@@ -81,7 +85,7 @@ remove_bus_stop 301
 
 7. **Add a train stop**  
 ```
-add_train_stop 401 "Uptown Station" 40.7831 -73.9712
+add_train_stop 401 Uptown_Station 40.7831 -73.9712
 ```
 
 8. **Remove a train stop**  
@@ -91,7 +95,7 @@ remove_train_stop 401
 
 9. **Create a route**  
 ```
-create_route 501 "City Center Loop"
+create_route 501 City_Center_Loop
 ```
 10. **Assign a bus to a route**  
  ```
@@ -115,17 +119,17 @@ create_route 501 "City Center Loop"
 
 14. **Join two routes at the intersecting stop (creates a new route)**  
  ```
- join_two_routes 501 502 601 "Combined City Route"
+ join_two_routes 501 502 601 Combined_City_Route
  ```
 
 15. **Join two routes at the provided stop (creates a new route)**  
  ```
- join_two_routes_at_stop 501 502 301 601 "Union Route"
+ join_two_routes_at_stop 501 502 301 601 Union_Route
  ```
 
 16. **Create a public path between two stops**  
  ```
- create_path 701 "Scenic Path" 11 301 401
+ create_path 701 Scenic_Path 11 301 401
  ```
 
 17. **Remove a public path**  
