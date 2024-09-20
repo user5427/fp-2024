@@ -7,6 +7,8 @@
 <join_two_routes> | <join_two_routes_at_stop> | 
 <create_path> | <remove_path> | 
 <create_trip> | <add_paths_to_trip> | <remove_paths_from_trip> | <add_stops_to_trip> | <remove_stops_from_trip> | <remove_trip> | <join_two_trips> | <print_all_trips> | <trip_valid>
+<next_stop> | <previous_stop> |
+<trip_distance>
 
 <add_bus> ::= "add_bus" " " <bus_id> " " <bus_park> " " <bus_working_start_time> " " <bus_working_end_time>
 <remove_bus> ::= "remove_bus" " " <bus_id>
@@ -50,6 +52,13 @@
 <print_all_trips> ::= "print_all_trips"
 <trip_valid> ::= "trip_valid" " " <trip_id> 
 
+<next_stop> ::= "next_stop" " " <stop_id> " " <next_stop_id>
+<previous_stop> ::= "previous_stop" " " <stop_id> " " <previous_stop_id>
+
+<trip_distance> ::= "trip_distance" " " <trip_id>
+
+<next_stop_id> ::= <integer>
+<previous_stop_id> ::= <integer>
 <bus_id> ::= <integer>
 <bus_park> ::= <string>
 <bus_working_start_time> ::= <string>

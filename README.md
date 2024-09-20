@@ -23,32 +23,42 @@ Program aim - check if given trip is valid (It is all connected)
 - Public paths
 
 **Main operations:**
-- Add/Remove bus
-- Add/Remove train
-- Add/Remove bus/train stop
-- Create a route
-- Assign bus/train to routes
-- Remove bus/train from routes
-- Add bus/train stop to route
-- Create a public path (a path from one stop to other stop)
-- Remove public path
+- Stops and routes
+    - Add/Remove bus
+    - Add/Remove train
+    - Add/Remove bus/train stop
+    - Create a route
+    - Assign bus/train to routes
+    - Remove bus/train from routes
+    - Add bus/train stop to route
+    - Add next stop id to a stop
+    - Add previous stop id to a stop
 
-- Print all the routes
-- Print all the busses/trains
-- Print all the route stops
-- Print all the route busses/trains
-- **Join two routes at the intersecting stop (creates a new route)**
-- **Join two routes at the provided stop (creates a new route)**
+- Public paths
+    - Create a public path (a path from one stop to other stop)
+    - Remove public path
 
-- Create a trip
-- Add paths to the trip
-- Remove paths from the trip
-- Add route stops to the trip
-- Remove route stops from the trip
-- Remove trip
-- **Join two trips to create a new trip**
-- Print all trips
-- Check if trip is valid
+- Printing
+    - Print all the routes
+    - Print all the busses/trains
+    - Print all the route stops
+    - Print all the route busses/trains
+    - Print all trips
+
+- Joining routes
+    - **Join two routes at the intersecting stop (creates a new route)**
+    - **Join two routes at the provided stop (creates a new route)**
+
+- Trips
+    - Create a trip
+    - Add paths to the trip
+    - Remove paths from the trip
+    - Add route stops to the trip
+    - Remove route stops from the trip
+    - Remove trip
+    - **Join two trips to create a new trip**
+    - Check if trip is valid
+    - Check trip distance
 
 Yes the same route will be able to have both busses and trains operating.
 
