@@ -37,8 +37,8 @@ Program aim - check if given trip is valid (It is all connected)
 - Print all the busses/trains
 - Print all the route stops
 - Print all the route busses/trains
-- Join two routes at the intersecting stop (creates a new route)
-- Join two routes at the provided stop (creates a new route)
+- **Join two routes at the intersecting stop (creates a new route)**
+- **Join two routes at the provided stop (creates a new route)**
 
 - Create a trip
 - Add paths to the trip
@@ -46,13 +46,13 @@ Program aim - check if given trip is valid (It is all connected)
 - Add route stops to the trip
 - Remove route stops from the trip
 - Remove trip
-- Join two trips to create a new trip
+- **Join two trips to create a new trip**
 - Print all trips
 - Check if trip is valid
 
 Yes the same route will be able to have both busses and trains operating.
 
-**Examples:**
+**Examples: (checked using BNF Playground)**
 1. **Add a bus to the system**  
 ```
 add_bus 101 Central_Park 06:00 18:00
