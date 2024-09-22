@@ -8,7 +8,8 @@
 
 <add_stop> ::= "add_stop" " " <stop_id> " " <name> " " <coord_x> " " <coord_y>
 <remove_stop> ::= "remove_stop" " " <stop_id>
-<next_stop> ::= "next_stop" " " <stop_id> " " <next_stop_id>
+<next_stop> ::= "next_stop" " "
+ <stop_id> " " <next_stop_id>
 <previous_stop> ::= "previous_stop" " " <stop_id> " " <previous_stop_id>
 
 <create_route> ::= "create_route" " " <route_id> " " <route_name>
@@ -38,7 +39,7 @@
 <recursive_trip_cleanup> ::= "recursive_trip_cleanup" (<trip_id> <stop_or_path> <list_of_stops_and_paths>) <find_partner_stop>  <recursive_trip_cleanup> 
 <find_partner_stop> ::= "find_partner_stop" (<stop_or_path> <list_of_stops_and_paths>) <find_partner_stop>
 <trip_distance> ::= "trip_distance" " " (<trip_id> <stop_or_path> <list_of_stops_and_paths>) <trip_distance>
-
+ 
 
 
 <list_of_stops_and_paths> ::= <stop_or_path> "," <list_of_stops_and_paths> 

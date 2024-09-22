@@ -55,51 +55,109 @@ Program aim - check if given trip is valid (It is all connected)
     - **Recursive trip cleanup**
     - **Trip distance** (recursive)
 
-Yes the same route will be able to have both busses and trains operating.
+### Examples of recursive commands (stop_ids changed to strings for clarity)
 
-**Examples: (checked using BNF Playground)**
+Diagram of the routes and paths:
+stop_1 -> stop_2 -> path_1 -> stop_3.
 
-5. **Add a stop**  
+1. **Recursive Trip Validation**
+Trip: stop_1 stop_2,path_1,stop_3.
+
+```
+recursive_trip_validation (123 stop_1 stop_2,path_1,stop_3) recursive_trip_validation
+stop_1 AND stop_2 connected.
+- recursive_trip_validation (123 stop_2 path_1,stop_3) recursive_trip_validation
+  stop_2 AND path_1 connected.
+-- recursive_trip_validation (123 path_1 stop_3) recursive_trip_validation
+   path_1 AND stop_3 connected.
+--- recursive_trip_validation (123 stop_3)
+    LIST EMPTY. END.
+result: true.
+```
+
+2. **Recursive Trip Cleanup**
+Trip: stop_2 stop_3,path_1,stop_1 -> not valid.
+
+```
+recursive_trip_cleanup (123 stop_2 stop_3,path_1,stop_1) 
+find_partner_stop (stop_2 stop_3,path_1,stop_1) recursive_trip_cleanup
++ find_partner_stop (stop_2 stop_3,path_1,stop_1) find_partner_stop
+  stop_2 AND stop_3 NOT CONNECTED. CONTINUE.
+++ find_partner_stop(stop_2 path_1, stop_1, ) find_partner_stop
+   stop_2 AND path_1 CONNECTED. END.
+- recursive_trip_cleanup (123 path_1 stop_3,stop_1) 
+  find_partner_stop (path_1 stop_3,stop_1) recursive_trip_cleanup
+  + find_partner_stop (path_1 stop_3,stop_1) find_partner_stop
+    path_1 AND stop_3 CONNECTED.END.
+-- recursive_trip_cleanup (123 stop_3 stop_1) 
+   find_partner_stop (stop_3 stop_1) recursive_trip_cleanup
+   + find_partner_stop (stop_3 stop_1) find_partner_stop
+      stop_3 AND stop_1 NOT CONNECTED. CONTINUE.
+   ++ find_partner_stop (stop_3) find_partner_stop
+       LIST EMPTY. END.
+--- recursive_trip_cleanup (123 stop_1) 
+    LIST EMPTY. INSERT stop_1 at the begining.
+result: stop_1 -> stop_2 -> path_1 -> stop_3
+```
+
+3. **Find Partner Stop**
+Trip: stop_1 stop_2,path_1,stop_3.
+
+```
+trip_distance (123 stop_1 stop_2,path_1,stop_3) trip_distance
+stop_1 AND stop_2 distance -> 10 km.
+- trip_distance (123 stop_2 path_1,stop_3) trip_distance
+  stop_2 AND path_1 distance -> 15 km.
+-- trip_distance (123 path_1 stop_3) trip_distance
+   path_1 AND stop_3 distance -> 5 km.
+--- trip_distance (123 stop_3)
+      LIST EMPTY. END.
+result: 30 km.
+```
+
+### Examples of simple commands: (checked using BNF Playground)
+
+1. **Add a stop**  
 ```
 add_stop 301 Downtown 40.7128 -74.0060
 ```
 
-6. **Remove a stop**  
+2. **Remove a stop**  
 ```
 remove_stop 301
 ```
 
-9. **Create a route**  
+3. **Create a route**  
 ```
 create_route 501 City_Center_Loop
 ```
 
-12. **Add a bus stop to a route**  
+4. **Add a bus stop to a route**  
  ```
  add_stop_to_route 301 501
  ```
 
-13. **Remove a bus from a route**  
+5. **Remove a bus from a route**  
  ```
  remove_from_route 101 501
  ```
 
-14. **Join two routes at the intersecting stop (creates a new route)**  
+6. **Join two routes at the intersecting stop (creates a new route)**  
  ```
  join_two_routes 501 502 601 Combined_City_Route
  ```
 
-15. **Join two routes at the provided stop (creates a new route)**  
+7. **Join two routes at the provided stop (creates a new route)**  
  ```
  join_two_routes_at_stop 501 502 301 601 Union_Route
  ```
 
-16. **Create a public path between two stops**  
+8. **Create a public path between two stops**  
  ```
  create_path 701 Scenic_Path 11 301 401
  ```
 
-17. **Remove a public path**  
+9. **Remove a public path**  
  ```
  remove_path 701
  ```
