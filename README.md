@@ -92,9 +92,9 @@ find_partner_stop (stop_2 stop_3,path_1,stop_1) recursive_trip_cleanup
 -- recursive_trip_cleanup (123 stop_3 stop_1) 
    find_partner_stop (stop_3 stop_1) recursive_trip_cleanup
    + find_partner_stop (stop_3 stop_1) find_partner_stop
-      stop_3 AND stop_1 NOT CONNECTED. CONTINUE.
+     stop_3 AND stop_1 NOT CONNECTED. CONTINUE.
    ++ find_partner_stop (stop_3) find_partner_stop
-       LIST EMPTY. END.
+      LIST EMPTY. END.
 --- recursive_trip_cleanup (123 stop_1) 
     LIST EMPTY. INSERT stop_1 at the begining.
 result: stop_1 -> stop_2 -> path_1 -> stop_3
@@ -111,7 +111,7 @@ stop_1 AND stop_2 distance -> 10 km.
 -- trip_distance (123 path_1 stop_3) trip_distance
    path_1 AND stop_3 distance -> 5 km.
 --- trip_distance (123 stop_3)
-      LIST EMPTY. END.
+    LIST EMPTY. END.
 result: 30 km.
 ```
 
