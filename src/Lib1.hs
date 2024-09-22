@@ -13,5 +13,4 @@ completions = [
     "create_path", "remove_path", "create_trip", "add_paths_to_trip", 
     "remove_paths_from_trip", "add_stops_to_trip", "remove_stops_from_trip", 
     "remove_trip", "recursive_trip_validation", "recursive_trip_cleanup", 
-    "trip_distance", "get_stops_and_paths"
-]
+    "trip_distance", "get_stops_and_paths"] -- update
