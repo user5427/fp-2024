@@ -4,7 +4,7 @@
 <join_two_routes> | <join_two_routes_at_stop> | <join_two_trips> | 
 <create_path> | <remove_path> | 
 <create_trip> | <add_paths_to_trip> | <remove_paths_from_trip> | <add_stops_to_trip> | <remove_stops_from_trip> | <remove_trip> | 
-<trip_valid> | <trip_distance> | <get_stops_and_paths>
+<recursive_trip_validation> | <recursive_trip_cleanup> | <trip_distance> | <get_stops_and_paths>
 
 <add_stop> ::= "add_stop" " " <stop_id> " " <name> " " <coord_x> " " <coord_y>
 <remove_stop> ::= "remove_stop" " " <stop_id>
@@ -12,8 +12,8 @@
 <previous_stop> ::= "previous_stop" " " <stop_id> " " <previous_stop_id>
 
 <create_route> ::= "create_route" " " <route_id> " " <route_name>
-<add_stop_to_route> ::= "add_bus_stop_to_route" " " <stop_id> " " <route_id>
-<remove_stop_from_route> ::= "remove_bus_stop_from_route" " " <stop_id> " " <route_id>
+<add_stop_to_route> ::= "add_stop_to_route" " " <stop_id> " " <route_id>
+<remove_stop_from_route> ::= "remove_stop_from_route" " " <stop_id> " " <route_id>
 
 <print_all_routes> ::= "print_all_routes"
 <print_all_trips> ::= "print_all_trips"
@@ -32,42 +32,18 @@
 <remove_stops_from_trip> ::= "remove_stops_from_trip" " " <trip_id> " " <stop_id>
 <remove_trip> ::= "remove_trip" " " <trip_id>
 <join_two_trips> ::= "join_two_trips" " " <trip_id> " " <trip_id> " " <new_trip_id> " " <name>
+
 <get_stops_and_paths> ::= "get_stops_and_paths" " " <trip_id>
+<recursive_trip_validation> ::= "recursive_trip_validation" (<trip_id> <stop_or_path> <list_of_stops_and_paths>) <recursive_trip_validation>  
+<recursive_trip_cleanup> ::= "recursive_trip_cleanup" (<trip_id> <stop_or_path> <list_of_stops_and_paths>) <find_partner_stop>  <recursive_trip_cleanup> 
+<find_partner_stop> ::= "find_partner_stop" (<stop_or_path> <list_of_stops_and_paths>) <find_partner_stop>
+<trip_distance> ::= "trip_distance" " " (<trip_id> <stop_or_path> <list_of_stops_and_paths>) <trip_distance>
+
+
+
 <list_of_stops_and_paths> ::= <stop_or_path> "," <list_of_stops_and_paths> 
                             | <stop_or_path> 
-                            | ε
 <stop_or_path> ::= <stop_id> | <path_id>
-
-
-<trip_valid> ::= "trip_valid" " " <trip_id> <recursive_trip_validation>
-                             { <get_stops_and_paths> ( <trip_id> ), <recursive_trip_validation> (first(<list_of_stops_and_paths>), rest(<list_of_stops_and_paths>)) }
-
-<recursive_trip_validation> ::= "recursive_trip_validation" <recursive_trip_validation> <stop_or_path> <list_of_stops_and_paths> 
-
-<find_one_direction_trip> ::= "find_one_direction_trip" <trip_id>
-                                {<get_stops_and_paths> ( <trip_id> )}
-<recursive_trip_cleanup> ::= "recursive_trip_cleanup" <stop_or_path> <list_of_stops_and_paths> 
-                            {
-                                <find_partner_stop> (<stop_or_path>, <list_of_stops_and_paths>),
-                                if more(<list_of_stops_and_paths>) then
-                                    <recursive_trip_cleanup> (first(<list_of_stops_and_paths>), rest(<list_of_stops_and_paths>))
-                                else 
-                                    finish_trip()
-                            } 
-
-<find_partner_stop> ::= "find_partner_stop" <stop_or_path> <list_of_stops_and_paths> 
-                            {
-                                if match(<stop_or_path>, first(<list_of_stops_and_paths>)) then
-                                    add_to_new_trip(<stop_or_path>, first(<list_of_stops_and_paths>))
-                                else 
-                                    continue
-                            } 
- 
-
-<trip_distance> ::= "trip_distance" " " <trip_id>
-
-
-
 <next_stop_id> ::= <integer>
 <previous_stop_id> ::= <integer>
 <stop_id> ::= <integer>
@@ -87,7 +63,6 @@
 <integer> ::= [0-9]+
 <pos> ::= ("0" |  [1-9] [0-9]*) ("." [0-9]+ )?
 <neg> ::= "-" <pos>
-
 <text> ::= <character> <text> | <character>
 <character> ::= <letter> | <digit>
 <letter> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" | ":" | "_"

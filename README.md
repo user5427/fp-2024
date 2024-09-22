@@ -48,10 +48,12 @@ Program aim - check if given trip is valid (It is all connected)
     - Remove paths from the trip
     - Add route stops to the trip
     - Remove route stops from the trip
+    - Get stops and paths
     - Remove trip
     - **Join two trips to create a new trip**
-    - Check if trip is valid (it is all connected)
-    - Check trip distance
+    - **Recursive trip validation**
+    - **Recursive trip cleanup**
+    - **Trip distance** (recursive)
 
 Yes the same route will be able to have both busses and trains operating.
 
@@ -59,36 +61,27 @@ Yes the same route will be able to have both busses and trains operating.
 
 5. **Add a stop**  
 ```
-add_bus_stop 301 Downtown 40.7128 -74.0060
+add_stop 301 Downtown 40.7128 -74.0060
 ```
 
 6. **Remove a stop**  
 ```
-remove_bus_stop 301
+remove_stop 301
 ```
 
 9. **Create a route**  
 ```
 create_route 501 City_Center_Loop
 ```
-10. **Assign a bus to a route**  
- ```
- assign_bus_to_route 101 501
- ```
-
-11. **Assign a train to a route**  
- ```
- assign_train_to_route 201 501
- ```
 
 12. **Add a bus stop to a route**  
  ```
- add_bus_stop_to_route 301 501
+ add_stop_to_route 301 501
  ```
 
 13. **Remove a bus from a route**  
  ```
- remove_bus_from_route 101 501
+ remove_from_route 101 501
  ```
 
 14. **Join two routes at the intersecting stop (creates a new route)**  
@@ -109,19 +102,4 @@ create_route 501 City_Center_Loop
 17. **Remove a public path**  
  ```
  remove_path 701
- ```
-
-18. **Print all the routes**  
- ```
- print_all_routes
- ```
-
-19. **Print all the busses**  
- ```
- print_all_busses
- ```
-
-20. **Print all route busses**  
- ```
- print_all_route_busses 501
  ```
