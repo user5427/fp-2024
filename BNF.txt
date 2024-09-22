@@ -1,40 +1,23 @@
-<command> ::= <add_bus> | <remove_bus> | <add_train> | <remove_train> | 
-<add_bus_stop> | <remove_bus_stop> | <add_train_stop> | <remove_train_stop> | 
-<create_route> | <assign_bus_to_route> | <assign_train_to_route> | <remove_bus_from_route> | <remove_train_from_route> |
-<add_bus_stop_to_route> | <remove_bus_stop_from_route> | <add_train_stop_to_route> | <remove_train_stop_from_route> |
-<print_all_routes> | <print_all_busses> | <print_all_trains> |
-<print_all_route_busses> | <print_all_route_trains> |
-<join_two_routes> | <join_two_routes_at_stop> | 
+<command> ::= <add_stop> | <remove_stop> | <create_route> |
+<add_stop_to_route> | <remove_stop_from_route> | <next_stop> | <previous_stop>
+<print_all_routes> | <print_all_trips> | <print_all_paths>
+<join_two_routes> | <join_two_routes_at_stop> | <join_two_trips> | 
 <create_path> | <remove_path> | 
-<create_trip> | <add_paths_to_trip> | <remove_paths_from_trip> | <add_stops_to_trip> | <remove_stops_from_trip> | <remove_trip> | <join_two_trips> | <print_all_trips> | <trip_valid>
-<next_stop> | <previous_stop> |
-<trip_distance>
+<create_trip> | <add_paths_to_trip> | <remove_paths_from_trip> | <add_stops_to_trip> | <remove_stops_from_trip> | <remove_trip> | 
+<trip_valid> | <trip_distance> | <get_stops_and_paths>
 
-<add_bus> ::= "add_bus" " " <bus_id> " " <bus_park> " " <bus_working_start_time> " " <bus_working_end_time>
-<remove_bus> ::= "remove_bus" " " <bus_id>
-<add_train> ::= "add_train" " " <train_id> " " <train_yard> " " <train_working_start_time> " " <train_working_end_time>
-<remove_train> ::= "remove_train" " " <train_id>
-<add_bus_stop> ::= "add_bus_stop" " " <stop_id> " " <name> " " <coord_x> " " <coord_y>
-<remove_bus_stop> ::= "remove_bus_stop" " " <stop_id>
-<add_train_stop> ::= "add_train_stop" " " <stop_id> " " <name> " " <coord_x> " " <coord_y>
-<remove_train_stop> ::= "remove_train_stop" " " <stop_id>
-
+<add_stop> ::= "add_stop" " " <stop_id> " " <name> " " <coord_x> " " <coord_y>
+<remove_stop> ::= "remove_stop" " " <stop_id>
+<next_stop> ::= "next_stop" " " <stop_id> " " <next_stop_id>
+<previous_stop> ::= "previous_stop" " " <stop_id> " " <previous_stop_id>
 
 <create_route> ::= "create_route" " " <route_id> " " <route_name>
-<assign_bus_to_route> ::= "assign_bus_to_route" " " <bus_id> " " <route_id>
-<assign_train_to_route> ::= "assign_train_to_route" " " <train_id> " " <route_id>
-<remove_bus_from_route> ::= "remove_bus_from_route" " " <bus_id> " " <route_id>
-<remove_train_from_route> ::= "remove_train_from_route" " " <train_id> " " <route_id>
-<add_bus_stop_to_route> ::= "add_bus_stop_to_route" " " <stop_id> " " <route_id>
-<remove_bus_stop_from_route> ::= "remove_bus_stop_from_route" " " <stop_id> " " <route_id>
-<add_train_stop_to_route> ::= "add_train_stop_to_route" " " <stop_id> " " <route_id>
-<remove_train_stop_from_route> ::= "remove_train_stop_from_route" " " <stop_id> " " <route_id>
+<add_stop_to_route> ::= "add_bus_stop_to_route" " " <stop_id> " " <route_id>
+<remove_stop_from_route> ::= "remove_bus_stop_from_route" " " <stop_id> " " <route_id>
 
 <print_all_routes> ::= "print_all_routes"
-<print_all_busses> ::= "print_all_busses"
-<print_all_trains> ::= "print_all_trains"
-<print_all_route_busses> ::= "print_all_route_busses" " " <route_id>
-<print_all_route_trains> ::= "print_all_route_trains" " " <route_id>
+<print_all_trips> ::= "print_all_trips"
+<print_all_paths> ::= "print_all_paths"
 
 <join_two_routes> ::= "join_two_routes" " " <route_id> " " <new_route_id> " " <route_id> " " <route_name>
 <join_two_routes_at_stop> ::= "join_two_routes_at_stop" " " <route_id> " " <route_id> " " <stop_id> " " <new_route_id> " " <route_name>
@@ -48,25 +31,37 @@
 <add_stops_to_trip> ::= "add_stops_to_trip" " " <trip_id> " " <stop_id>
 <remove_stops_from_trip> ::= "remove_stops_from_trip" " " <trip_id> " " <stop_id>
 <remove_trip> ::= "remove_trip" " " <trip_id>
-<join_two_trips> ::= "join_two_trips" " " <trip_id> " " <trip_id> " " <new_trip_id> " " <name>
-<print_all_trips> ::= "print_all_trips"
-<trip_valid> ::= "trip_valid" " " <trip_id> 
+<join_two_trips> ::= "join_two_trips" " " <trip_id> " " <trip_id> " " <new_trip_id> " " <name>.
+<get_stops_and_paths> ::= "get_stops_and_paths" " " <trip_id> { <list_of_stops_and_paths> }
+<list_of_stops_and_paths> ::= <stop_or_path> "," <list_of_stops_and_paths> 
+                            | <stop_or_path> 
+                            | ε
+<stop_or_path> ::= <stop_id> | <path_id>
 
-<next_stop> ::= "next_stop" " " <stop_id> " " <next_stop_id>
-<previous_stop> ::= "previous_stop" " " <stop_id> " " <previous_stop_id>
+
+<trip_valid> ::= "trip_valid" " " <trip_id>
+                             { <get_stops_and_paths> ( <trip_id> ), <recursive_trip_validation> (first(<list_of_stops_and_paths>), rest(<list_of_stops_and_paths>)) }
+
+<recursive_trip_validation> ::= "recursive_trip_validation" <stop_or_path> <list_of_stops_and_paths>
+                               { <recursive_trip_validation> (first(<list_of_stops_and_paths>), rest(<list_of_stops_and_paths>)) }
+                               | ε
+
+<find_one_direction_trip> ::= "find_one_direction_trip" <trip_id>
+                                {<get_stops_and_paths> ( <trip_id> )}
+<recursive_trip_cleanup> ::= "recursive_trip_cleanup" <stop_or_path> <list_of_stops_and_paths> 
+                            { <find_partner_stop> (<stop_or_path>, <list_of_stops_and_paths>), <recursive_trip_cleanup> (first(<list_of_stops_and_paths>), rest(<list_of_stops_and_paths>))} 
+                            | ε { <new_trip> }
+<find_partner_stop> ::= "find_partner_stop" <stop_or_path> <list_of_stops_and_paths> 
+                            {
+                                <find_partner_stop> (<stop_or_path>, <list_of_stops_and_paths)
+                            } | ε
 
 <trip_distance> ::= "trip_distance" " " <trip_id>
 
+
+
 <next_stop_id> ::= <integer>
 <previous_stop_id> ::= <integer>
-<bus_id> ::= <integer>
-<bus_park> ::= <string>
-<bus_working_start_time> ::= <string>
-<bus_working_end_time> ::= <string>
-<train_id> ::= <integer>
-<train_yard> ::= <string>
-<train_working_start_time> ::= <string>
-<train_working_end_time> ::= <string>
 <stop_id> ::= <integer>
 <name> ::= <string>
 <coord_x> ::= <float>

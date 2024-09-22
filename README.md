@@ -15,22 +15,16 @@
 Program aim - check if given trip is valid (It is all connected)
 
 **Main entities:**
-- Busses
-- Trains
 - Stops
-- Bus routes
-- Train routes
+- Routes
 - Public paths
+- Trips
 
 **Main operations:**
 - Stops and routes
-    - Add/Remove bus
-    - Add/Remove train
-    - Add/Remove bus/train stop
+    - Add/Remove stop
     - Create a route
-    - Assign bus/train to routes
-    - Remove bus/train from routes
-    - Add bus/train stop to route
+    - Add stop to route
     - Add next stop id to a stop
     - Add previous stop id to a stop
 
@@ -40,9 +34,8 @@ Program aim - check if given trip is valid (It is all connected)
 
 - Printing
     - Print all the routes
-    - Print all the busses/trains
     - Print all the route stops
-    - Print all the route busses/trains
+    - Print all public paths
     - Print all trips
 
 - Joining routes
@@ -57,50 +50,21 @@ Program aim - check if given trip is valid (It is all connected)
     - Remove route stops from the trip
     - Remove trip
     - **Join two trips to create a new trip**
-    - Check if trip is valid
+    - Check if trip is valid (it is all connected)
     - Check trip distance
 
 Yes the same route will be able to have both busses and trains operating.
 
 **Examples: (checked using BNF Playground)**
-1. **Add a bus to the system**  
-```
-add_bus 101 Central_Park 06:00 18:00
-```
 
-2. **Remove a bus from the system**  
-```
-remove_bus 101
-```
-
-3. **Add a train to the system**  
-```
-add_train 201 Main_Yard 05:00 22:00
-```
-
-4. **Remove a train from the system**  
-```
-remove_train 201
-```
-
-5. **Add a bus stop**  
+5. **Add a stop**  
 ```
 add_bus_stop 301 Downtown 40.7128 -74.0060
 ```
 
-6. **Remove a bus stop**  
+6. **Remove a stop**  
 ```
 remove_bus_stop 301
-```
-
-7. **Add a train stop**  
-```
-add_train_stop 401 Uptown_Station 40.7831 -73.9712
-```
-
-8. **Remove a train stop**  
-```
-remove_train_stop 401
 ```
 
 9. **Create a route**  
