@@ -31,30 +31,38 @@
 <add_stops_to_trip> ::= "add_stops_to_trip" " " <trip_id> " " <stop_id>
 <remove_stops_from_trip> ::= "remove_stops_from_trip" " " <trip_id> " " <stop_id>
 <remove_trip> ::= "remove_trip" " " <trip_id>
-<join_two_trips> ::= "join_two_trips" " " <trip_id> " " <trip_id> " " <new_trip_id> " " <name>.
-<get_stops_and_paths> ::= "get_stops_and_paths" " " <trip_id> { <list_of_stops_and_paths> }
+<join_two_trips> ::= "join_two_trips" " " <trip_id> " " <trip_id> " " <new_trip_id> " " <name>
+<get_stops_and_paths> ::= "get_stops_and_paths" " " <trip_id>
 <list_of_stops_and_paths> ::= <stop_or_path> "," <list_of_stops_and_paths> 
                             | <stop_or_path> 
                             | ε
 <stop_or_path> ::= <stop_id> | <path_id>
 
 
-<trip_valid> ::= "trip_valid" " " <trip_id>
+<trip_valid> ::= "trip_valid" " " <trip_id> <recursive_trip_validation>
                              { <get_stops_and_paths> ( <trip_id> ), <recursive_trip_validation> (first(<list_of_stops_and_paths>), rest(<list_of_stops_and_paths>)) }
 
-<recursive_trip_validation> ::= "recursive_trip_validation" <stop_or_path> <list_of_stops_and_paths>
-                               { <recursive_trip_validation> (first(<list_of_stops_and_paths>), rest(<list_of_stops_and_paths>)) }
-                               | ε
+<recursive_trip_validation> ::= "recursive_trip_validation" <recursive_trip_validation> <stop_or_path> <list_of_stops_and_paths> 
 
 <find_one_direction_trip> ::= "find_one_direction_trip" <trip_id>
                                 {<get_stops_and_paths> ( <trip_id> )}
 <recursive_trip_cleanup> ::= "recursive_trip_cleanup" <stop_or_path> <list_of_stops_and_paths> 
-                            { <find_partner_stop> (<stop_or_path>, <list_of_stops_and_paths>), <recursive_trip_cleanup> (first(<list_of_stops_and_paths>), rest(<list_of_stops_and_paths>))} 
-                            | ε { <new_trip> }
+                            {
+                                <find_partner_stop> (<stop_or_path>, <list_of_stops_and_paths>),
+                                if more(<list_of_stops_and_paths>) then
+                                    <recursive_trip_cleanup> (first(<list_of_stops_and_paths>), rest(<list_of_stops_and_paths>))
+                                else 
+                                    finish_trip()
+                            } 
+
 <find_partner_stop> ::= "find_partner_stop" <stop_or_path> <list_of_stops_and_paths> 
                             {
-                                <find_partner_stop> (<stop_or_path>, <list_of_stops_and_paths)
-                            } | ε
+                                if match(<stop_or_path>, first(<list_of_stops_and_paths>)) then
+                                    add_to_new_trip(<stop_or_path>, first(<list_of_stops_and_paths>))
+                                else 
+                                    continue
+                            } 
+ 
 
 <trip_distance> ::= "trip_distance" " " <trip_id>
 
