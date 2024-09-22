@@ -61,6 +61,10 @@ join_two_routes(create_route(4, D_Route, 067,8), join_two_routes(join_two_routes
 join_two_trips(create_trip(7, Trip_Name, 3,create_stop(62, Name, 0, 75.5, 19537, 530),create_stop(4, Name, -0, 1, 94, 50)), 75, 4, New_Name)
 ```
 
+5.
+```
+join_two_routes(join_two_routes(join_two_routes(join_two_routes(52, 0, 6, F_Route), 0, 6, F_Route), 0, 6, F_Route), 0, 6, F_Route)
+```
 [BNF FILE](BNF.txt)
 
 <!-- 
