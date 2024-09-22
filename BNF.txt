@@ -1,50 +1,34 @@
-<command> ::= <add_stop> | <remove_stop> | <create_route> |
-<add_stop_to_route> | <remove_stop_from_route> | <next_stop> | <previous_stop>
-<print_all_routes> | <print_all_trips> | <print_all_paths>
-<join_two_routes> | <join_two_routes_at_stop> | <join_two_trips> | 
-<create_path> | <remove_path> | 
-<create_trip> | <add_paths_to_trip> | <remove_paths_from_trip> | <add_stops_to_trip> | <remove_stops_from_trip> | <remove_trip> | 
-<recursive_trip_validation> | <recursive_trip_cleanup> | <trip_distance> | <get_stops_and_paths>
+<command> ::= <create_route> | <join_two_routes> | 
+<join_two_routes_at_stop> | <join_two_trips> | 
+<create_path> | <create_trip> |
+<validate_trip> | <cleanup_trip> | <trip_distance>
 
-<add_stop> ::= "add_stop" " " <stop_id> " " <name> " " <coord_x> " " <coord_y>
-<remove_stop> ::= "remove_stop" " " <stop_id>
-<next_stop> ::= "next_stop" " "
- <stop_id> " " <next_stop_id>
-<previous_stop> ::= "previous_stop" " " <stop_id> " " <previous_stop_id>
+<create_stop> ::= "create_stop(" <stop_id> ", " <name> ", " <coord_x> ", " <coord_y> ", " <next_stop_id> ", " <previous_stop_id> ")"
+<create_route> ::= "create_route(" <route_id> ", " <route_name> ", " <list_of_stop_ids> ")"
 
-<create_route> ::= "create_route" " " <route_id> " " <route_name>
-<add_stop_to_route> ::= "add_stop_to_route" " " <stop_id> " " <route_id>
-<remove_stop_from_route> ::= "remove_stop_from_route" " " <stop_id> " " <route_id>
+<join_two_routes> ::= "join_two_routes(" <route> ", " <route> ", " <new_route_id> ", " <route_name> ")"
+<join_two_routes_at_stop> ::= "join_two_routes_at_stop(" <route> ", " <route> ", " <stop_or_path_or_creat> ", " <new_route_id> ", " <route_name> ")"
 
-<print_all_routes> ::= "print_all_routes"
-<print_all_trips> ::= "print_all_trips"
-<print_all_paths> ::= "print_all_paths"
+<create_path> ::= "create_path(" <path_id> ", " <name> ", " <path_length> ", " <stop_id> ", " <stop_id> ")"
 
-<join_two_routes> ::= "join_two_routes" " " <route_id> " " <new_route_id> " " <route_id> " " <route_name>
-<join_two_routes_at_stop> ::= "join_two_routes_at_stop" " " <route_id> " " <route_id> " " <stop_id> " " <new_route_id> " " <route_name>
+<create_trip> ::= "create_trip(" <trip_id> ", " <trip_name> ", " <list_of_stops_paths_creat> ")"
+<join_two_trips> ::= "join_two_trips(" <trip> ", " <trip> ", " <new_trip_id> ", " <name> ")"
 
-<create_path> ::= "create_path" " " <path_id> " " <name> " " <path_length> " " <stop_id> " " <stop_id>
-<remove_path> ::= "remove_path" " " <path_id>
+<cleanup_trip> ::= "cleanup_trip(" <trip> ", " <stops_or_paths> ", " <list_of_stops_and_paths> ")"
+<validate_trip> ::= "validate_trip(" <trip> ", " <stops_or_paths> ", " <list_of_stops_and_paths>  ")"
+<find_next_stop> ::= "find_next_stop(" <stop_or_path_or_creat> ", " <route> ")"
+<trip_distance> ::= "trip_distance(" <trip> ", " <stop_or_path_or_creat> ", " <list_of_stops_and_paths> ")"
 
-<create_trip> ::= "create_trip" " " <trip_id> " " <trip_name>
-<add_paths_to_trip> ::= "add_paths_to_trip" " " <trip_id> " " <path_id>
-<remove_paths_from_trip> ::= "remove_paths_from_trip" " " <trip_id> " " <path_id>
-<add_stops_to_trip> ::= "add_stops_to_trip" " " <trip_id> " " <stop_id>
-<remove_stops_from_trip> ::= "remove_stops_from_trip" " " <trip_id> " " <stop_id>
-<remove_trip> ::= "remove_trip" " " <trip_id>
-<join_two_trips> ::= "join_two_trips" " " <trip_id> " " <trip_id> " " <new_trip_id> " " <name>
+<list_of_stop_ids> ::= <stop_id> "," <list_of_stop_ids> | <stop_id>
+<list_of_stops_paths_creat> ::= <stop_or_path_or_creat> "," <list_of_stops_paths_creat> 
+                            | <stop_or_path_or_creat> 
+<list_of_stops_and_paths> ::= <stops_or_paths> "," <list_of_stops_and_paths> 
+                            | <stops_or_paths> 
 
-<get_stops_and_paths> ::= "get_stops_and_paths" " " <trip_id>
-<recursive_trip_validation> ::= "recursive_trip_validation" (<trip_id> <stop_or_path> <list_of_stops_and_paths>) <recursive_trip_validation>  
-<recursive_trip_cleanup> ::= "recursive_trip_cleanup" (<trip_id> <stop_or_path> <list_of_stops_and_paths>) <find_partner_stop>  <recursive_trip_cleanup> 
-<find_partner_stop> ::= "find_partner_stop" (<stop_or_path> <list_of_stops_and_paths>) <find_partner_stop>
-<trip_distance> ::= "trip_distance" " " (<trip_id> <stop_or_path> <list_of_stops_and_paths>) <trip_distance>
- 
-
-
-<list_of_stops_and_paths> ::= <stop_or_path> "," <list_of_stops_and_paths> 
-                            | <stop_or_path> 
-<stop_or_path> ::= <stop_id> | <path_id>
+<trip> ::= <trip_id> | <create_trip>
+<route> ::= <route_id> | <create_route> | <join_two_routes> | <join_two_routes_at_stop>
+<stop_or_path_or_creat> ::= <create_stop> | <stops_or_paths>
+<stops_or_paths> ::= <stop_id> | <path_id>
 <next_stop_id> ::= <integer>
 <previous_stop_id> ::= <integer>
 <stop_id> ::= <integer>
@@ -60,11 +44,8 @@
 <new_route_id> ::= <integer>
 <trip_name> ::= <string>
 <float> ::= <pos> | <neg>
-<string> ::= <text>
 <integer> ::= [0-9]+
 <pos> ::= ("0" |  [1-9] [0-9]*) ("." [0-9]+ )?
 <neg> ::= "-" <pos>
-<text> ::= <character> <text> | <character>
-<character> ::= <letter> | <digit>
-<letter> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M" | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z" | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m" | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" | ":" | "_"
-<digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+<string> ::= <character> <string> | <character>
+<character> ::= [1-9] | [A-Z] | [a-z] | "_"
