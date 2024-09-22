@@ -60,7 +60,7 @@ Program aim - check if given trip is valid (It is all connected)
 Diagram of the routes and paths:
 stop_1 -> stop_2 -> path_1 -> stop_3.
 
-1. **Recursive trip validation**
+1. **Recursive trip validation.**
 Trip: stop_1 stop_2,path_1,stop_3.
 
 ```
@@ -75,7 +75,7 @@ stop_1 AND stop_2 connected.
 result: true.
 ```
 
-2. **Recursive trip cleanup**
+2. **Recursive trip cleanup.**
 Trip: stop_2 stop_3,path_1,stop_1 -> not valid.
 
 ```
@@ -100,7 +100,7 @@ find_partner_stop (stop_2 stop_3,path_1,stop_1) recursive_trip_cleanup
 result: stop_1 -> stop_2 -> path_1 -> stop_3
 ```
 
-3. **Find trip distance**
+3. **Find trip distance.**
 Trip: stop_1 stop_2,path_1,stop_3.
 
 ```
