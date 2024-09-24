@@ -16,7 +16,7 @@
 
 <cleanup_trip> ::= "cleanup_trip(" <trip> ", " <stops_or_paths> ", " <list_of_stops_and_paths> ")"
 <validate_trip> ::= "validate_trip(" <trip> ", " <stops_or_paths> ", " <list_of_stops_and_paths>  ")"
-<find_next_stop> ::= "find_next_stop(" <stop_or_path_or_creat> ", " <route> ")"
+<find_next_stop> ::= "find_next_stop(" <stops_or_paths> ", " <route> ")"
 <trip_distance> ::= "trip_distance(" <trip> ", " <stop_or_path_or_creat> ", " <list_of_stops_and_paths> ")"
 
 <list_of_stop_ids> ::= <stop_id> "," <list_of_stop_ids> | <stop_id>
