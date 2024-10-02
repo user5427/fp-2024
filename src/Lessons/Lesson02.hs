@@ -3,15 +3,23 @@ module Lessons.Lesson02 (Wheel(..)) where
 
 
 -- >>> sum' []
--- 0
+-- <stderr>: hPutChar: invalid argument (cannot encode character '\8216')
 -- >>> sum' [1,2,3]
--- 6
+-- <stderr>: hPutChar: invalid argument (cannot encode character '\8216')
 sum' :: [Integer] -> Integer
 sum' [] = 0
-sum' (h:t) = h + (sum' t)
+sum' (h:t) = h + sum' t
 
--- >>> sum'' []
--- 0
+-- >>> sumF []
+
+sumB :: [Integer] -> Integer
+sumB [] = 0
+sumB (h:t) = h + sumB t
+
+-- >>> sumB [1, 5, 6]
+-- 12
+
+
 -- >>> sum' [1]
 -- 1
 sum'' :: [Integer] -> Integer
@@ -49,6 +57,16 @@ safeDiv :: Integer -> Integer -> Maybe Integer
 safeDiv _ 0 = Nothing
 safeDiv a b = Just (a `div` b)
 
+
+
+-- >>> safeDiv' 1 0
+-- No instance for (Show (MyBetterMaybe Integer))
+--   arising from a use of `evalPrint'
+-- In a stmt of an interactive GHCi command: evalPrint it_aauy
+-- >>> safeDiv' 10 2
+-- No instance for (Show (MyBetterMaybe Integer))
+--   arising from a use of `evalPrint'
+-- In a stmt of an interactive GHCi command: evalPrint it_aawy
 data MyBetterMaybe a = MyNothing | MyJust a
 
 safeDiv' :: Integer -> Integer -> MyBetterMaybe Integer
