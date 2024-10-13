@@ -1,4 +1,6 @@
 {-# LANGUAGE InstanceSigs #-}
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Redundant lambda" #-}
 module Lib2
     ( Query(..),
     parseQuery,
@@ -42,6 +44,41 @@ parseQuery _ = Left "Not implemented 2"
 
 type Parser a = String -> Either String (a, String)
 
+many :: Parser a -> Parser [a]
+many p = many' p []
+    where
+        many' p' acc = \input ->
+            case p' input of
+                Left _ -> Right (acc, input)
+                Right (v, r) -> many' p' (acc ++ [v]) r
+
+and2 :: Parser a -> Parser b -> Parser (a, b)
+and2 a b = \input ->
+    case a input of
+        Right (v1, r1) ->
+            case b r1 of
+                Right (v2, r2) -> Right ((v1, v2), r2)
+                Left e2 -> Left e2
+        Left e1 -> Left e1
+
+and2' :: (a -> b -> c) -> Parser a -> Parser b -> Parser c
+and2' c a b = \input ->
+    case a input of
+        Right (v1, r1) ->
+            case b r1 of
+                Right (v2, r2) -> Right (c v1 v2, r2)
+                Left e2 -> Left e2
+        Left e1 -> Left e1
+
+or2 :: Parser a -> Parser a -> Parser a
+or2 a b = \input ->
+    case a input of
+        Right r1 -> Right r1
+        Left e1 ->
+            case b input of
+                Right r2 -> Right r2
+                Left e2 -> Left (e1 ++ ", " ++ e2)
+
 -- >>> parseExact "abc" "abcdef" 
 -- Right ("abc","def")
 parseExact :: String -> Parser String
@@ -73,6 +110,21 @@ parseNumber input =
             [] -> Left "not a number"
             _ -> Right (read digits, rest)
 
+-- >>> parseFloat "123.123"
+-- Right (123.123,"")
+-- >>> parseFloat "123.123.123"
+-- Prelude.read: no parse
+parseFloat :: Parser Float
+parseFloat [] = Left "empty input, cannot parse a number"
+parseFloat input =
+    let
+        digits = L.takeWhile (\c -> C.isDigit c || c == '.') input
+        rest = drop (length digits) input
+    in
+        case digits of
+            [] -> Left "not a number"
+            _ -> Right (read digits, rest)
+
 parseChar :: Char -> Parser Char
 parseChar c [] = Left ("Cannot find " ++ [c] ++ " in an empty input")
 parseChar c s@(h:t) = if c == h then Right (c, t) else Left (c : " is not found in " ++ s)
@@ -91,7 +143,6 @@ parseString input =
     case letters of
       [] -> Left "not a string"
       _ -> Right (letters, rest)
-
 
 
 
