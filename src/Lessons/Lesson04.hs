@@ -1,8 +1,7 @@
 {-# OPTIONS_GHC -Wno-unused-top-binds -Wname-shadowing #-}
-{-# LANGUAGE ImportQualifiedPost #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Redundant lambda" #-}
-module Lessons.Lesson04 () where
+module Lessons.Lesson04 (Parser, parseNumber, and2', or2, parseChar) where
 
 import qualified Data.Char as C
 import qualified Data.List as L
@@ -42,15 +41,9 @@ and2 a b = \input ->
 
 data CharPair = CharPair Char Char
     deriving Show
--- >>> show (CharPair 'a' 'b')
--- "CharPair 'a' 'b'"
-
 
 -- >>> and2' CharPair parseLetter parseLetter "dfdf"
 -- Right (CharPair 'd' 'f',"df")
--- >>> and2' (,) parseLetter parseLetter "dfdf"
--- Right (('d','f'),"df")
-
 and2' :: (a -> b -> c) -> Parser a -> Parser b -> Parser c
 and2' c a b = \input ->
     case a input of
@@ -68,14 +61,6 @@ parseDigit :: Parser Char
 parseDigit [] = Left "Cannot find any digits in an empty input"
 parseDigit s@(h:t) = if C.isDigit h then Right (h, t) else Left (s ++ " does not start with a digit")
 
--- >>> or2 parseLetter parseDigit "a"
--- Right ('a',"")
--- >>> or2 parseLetter parseDigit "1"
--- Right ('1',"")
--- >>> or2 parseLetter parseDigit "/-+/-+"
--- Left "/-+/-+ does not start with a letter, /-+/-+ does not start with a digit"
-
-
 or2 :: Parser a -> Parser a -> Parser a
 or2 a b = \input ->
     case a input of
@@ -84,10 +69,10 @@ or2 a b = \input ->
             case b input of
                 Right r2 -> Right r2
                 Left e2 -> Left (e1 ++ ", " ++ e2)
--- >>> parseAlphaNum "a2bb"
--- Right ('a',"2bb")
--- >>> parseAlphaNum "2abb"
--- Right ('2',"abb")
+-- >>> parseAlphaNum "a2"
+-- Right ('a',"2")
+-- >>> parseAlphaNum "2a"
+-- Right ('2',"a")
 -- >>> parseAlphaNum " "
 -- Left "  does not start with a letter,   does not start with a digit"
 parseAlphaNum :: Parser Char
