@@ -81,6 +81,12 @@ or2 a b = \input ->
 
 -- >>> parseExact "abc" "abcdef" 
 -- Right ("abc","def")
+-- >>> parseExact "." ".def"
+-- Right (".","def")
+-- >>> parseExact "." "de.f"
+-- Left "Expected ."
+-- >>> parseExact "" "def"
+-- Right ("","def")
 parseExact :: String -> Parser String
 parseExact expected input =
   let len = length expected
@@ -88,14 +94,77 @@ parseExact expected input =
        then Right (expected, drop len input)
        else Left $ "Expected " ++ expected
 
+-- >>> parseExactInString "." "abc.def"
+-- Right (".","def")
+-- >>> parseExactInString "." "de.f.a"
+-- Right (".","f.a")
+-- >>> parseExactInString "." "123.123"
+-- Right (".","123")
+parseExactInString :: String -> Parser String
+parseExactInString str [] = Left "Empty input, cannot parse a string"
+parseExactInString str input =  
+  let 
+    letters = L.takeWhile (\c -> C.isLetter c || C.isNumber c) input
+    rest = drop (length letters) input
+  in 
+    case parseExact str rest of
+      Right (v1, r1) -> Right (v1, r1)
+      Left e1 -> Left e1
+
+-- >>> parseChar 'a' "abc"
+-- Right ('a',"bc")
+-- >>> parseChar '.' "de.f"
+-- Left ". is not found in de.f"
+parseChar :: Char -> Parser Char
+parseChar c [] = Left ("Cannot find " ++ [c] ++ " in an empty input")
+parseChar c s@(h:t) = if c == h then Right (c, t) else Left (c : " is not found in " ++ s)
+
+parseLetter :: Parser Char
+parseLetter [] = Left "Cannot find any letter in an empty input"
+parseLetter s@(h:t) = if C.isLetter h then Right (h, t) else Left (s ++ " does not start with a letter")
+
+-- >>> parseString "432"
+-- Left "not a string"
+-- >>> parseString "labas..."
+
+parseString :: Parser String
+parseString [] = Left "empty input, cannot parse a string"
+parseString input = 
+  let 
+    letters = L.takeWhile C.isLetter input
+    rest = drop (length letters) input
+  in 
+    case letters of
+      [] -> Left "not a string"
+      _ -> Right (letters, rest)
+
+
+-- >>> parseSeperator "123,123123,31232"
+-- Right (",","123123,31232")
+-- >>> parseSeperator "123, 123"
+-- Right (",","123")
 parseSeperator :: Parser String
 parseSeperator input =
-  case parseExact "," input of
-    Right (v1, r1) -> Right (v1, r1)
+  case parseExactInString "," input of
+    Right (v1, r1) -> case parseExact " " r1 of
+      Right (_, r2) -> Right (v1, r2)
+      Left _ -> Right (v1, r1)
     Left e1 -> 
-      case parseExact ", " input of
+      case parseExactInString ", " input of
         Right(v2, r2) -> Right(v2, r2)
         Left e2 -> Left(e1 ++ " or " ++ e2)
+
+-- >>> parseDotSeperator "123.123"
+-- Left "Expected ."
+parseDotSeperator :: Parser String
+parseDotSeperator input =
+  case parseExactInString "." input of
+    Left e1 -> Left e1
+    Right (v1, r1) -> 
+      case parseExactInString "." r1 of
+        Right _ -> Left "too many dots"
+        Left _ -> Right (v1, r1)
+
 
 
 
@@ -118,6 +187,7 @@ parseFloat :: Parser Float
 parseFloat [] = Left "empty input, cannot parse a number"
 parseFloat input =
     let
+        isSeperatorOne = parseDotSeperator input
         digits = L.takeWhile (\c -> C.isDigit c || c == '.') input
         rest = drop (length digits) input
     in
@@ -125,24 +195,7 @@ parseFloat input =
             [] -> Left "not a number"
             _ -> Right (read digits, rest)
 
-parseChar :: Char -> Parser Char
-parseChar c [] = Left ("Cannot find " ++ [c] ++ " in an empty input")
-parseChar c s@(h:t) = if c == h then Right (c, t) else Left (c : " is not found in " ++ s)
 
-parseLetter :: Parser Char
-parseLetter [] = Left "Cannot find any letter in an empty input"
-parseLetter s@(h:t) = if C.isLetter h then Right (h, t) else Left (s ++ " does not start with a letter")
-
-parseString :: Parser String
-parseString [] = Left "empty input, cannot parse a string"
-parseString input = 
-  let 
-    letters = L.takeWhile C.isLetter input
-    rest = drop (length letters) input
-  in 
-    case letters of
-      [] -> Left "not a string"
-      _ -> Right (letters, rest)
 
 
 
