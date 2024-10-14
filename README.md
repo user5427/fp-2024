@@ -20,3 +20,8 @@
 BNF file changes:
 *  cleanup_trip, validate_trip, find_next_stop, find_previous_stop functions require less arguments or different arguments now.
 *  added set_next_stop and set_previous_stop functions because one stop can have multiple routes with different next or previous stops.
+* removed `<neg>` and replaced it with just `"-" <pos>` inside the `<float>` 
+* removed `<trip_name>` and `<route_name>`. Replaced with `<name>`. Reason: not needed.
+* removed `<new_trip_id>` and `<new_route_id>` and replaced with `<trip_id>` and `<route_id>`. Reason: for better clarity.
+* added `<point>` which includes `<coord_x>` and `<coord_y>`
+* `<next_stop_id> ::= <stop_id> <previous_stop_id> ::= <stop_id>` before stop_id it was integer

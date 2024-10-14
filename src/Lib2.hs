@@ -86,6 +86,18 @@ and2' c a b = \input ->
                 Left e2 -> Left e2
         Left e1 -> Left e1
 
+and3' :: (a -> b -> c -> d) -> Parser a -> Parser b -> Parser c -> Parser d
+and3' f a b c = \input ->
+    case a input of
+        Right (v1, r1) ->
+            case b r1 of
+                Right (v2, r2) ->
+                    case c r2 of
+                        Right (v3, r3) -> Right (f v1 v2 v3, r3)
+                        Left e3 -> Left e3
+                Left e2 -> Left e2
+        Left e1 -> Left e1
+
 or2 :: Parser a -> Parser a -> Parser a
 or2 a b = \input ->
     case a input of
@@ -125,10 +137,13 @@ parseLetter :: Parser Char
 parseLetter [] = Left "Cannot find any letter in an empty input"
 parseLetter s@(h:t) = if C.isLetter h || h == '_' then Right (h, t) else Left (s ++ " does not start with a letter")
 
+parseDigit :: Parser Char
+parseDigit [] = Left "Cannot find any digits in an empty input"
+parseDigit s@(h:t) = if C.isDigit h then Right (h, t) else Left (s ++ " does not start with a digit")
 
 -- <string> ::= <character> <string> | <character>
 parseString :: Parser String
-parseString = many parseLetter
+parseString = many (parseLetter `or2` parseDigit)
 
 
 -- ", "
@@ -199,8 +214,169 @@ parseFloat input =
           Right (v2, r2) -> Right (v2, r2)
           Left e2 -> Left e2
 
+data TripId = TripId Char Int deriving Show
 
+-- <trip_id> ::= "T" <integer>
+-- >>> parseTripId "T123"
+-- Right (TripId 'T' 123,"")
+parseTripId :: Parser TripId
+parseTripId [] = Left "empty input, cannot parse a trip id"
+parseTripId input = 
+  let
+    typeChar = parseChar 'T' input
+    in case typeChar of
+      Left e1 -> Left e1
+      Right (v0, r1) ->
+        let
+          tripId = parseInteger r1
+          in case tripId of
+            Left e1 -> Left e1
+            Right (v1, r1) -> Right (TripId v0 (fromIntegral v1), r1)
 
+data RouteId = RouteId Char Int deriving Show
+
+-- <route_id> ::= <integer>
+parseRouteId :: Parser RouteId
+parseRouteId [] = Left "empty input, cannot parse a route id"
+parseRouteId input = 
+  let
+    typeChar = parseChar 'R' input
+    in case typeChar of
+      Left e1 -> Left e1
+      Right (v0, r1) ->
+        let
+          tripId = parseInteger r1
+          in case tripId of
+            Left e1 -> Left e1
+            Right (v1, r1) -> Right (RouteId v0 (fromIntegral v1), r1)
+
+data StopId = StopId Char Int deriving Show
+
+-- <stop_id> ::= <integer>
+parseStopId :: Parser StopId
+parseStopId [] = Left "empty input, cannot parse a stop id"
+parseStopId input = 
+  let
+    typeChar = parseChar 'S' input
+    in case typeChar of
+      Left e1 -> Left e1
+      Right (v0, r1) ->
+        let
+          tripId = parseInteger r1
+          in case tripId of
+            Left e1 -> Left e1
+            Right (v1, r1) -> Right (StopId v0 (fromIntegral v1), r1)
+
+data PathId = PathId Char Int deriving Show
+
+-- <path_id> ::= <integer>
+parsePathId :: Parser PathId
+parsePathId [] = Left "empty input, cannot parse a path id"
+parsePathId input = 
+  let
+    typeChar = parseChar 'P' input
+    in case typeChar of
+      Left e1 -> Left e1
+      Right (v0, r1) ->
+        let
+          tripId = parseInteger r1
+          in case tripId of
+            Left e1 -> Left e1
+            Right (v1, r1) -> Right (PathId v0 (fromIntegral v1), r1)
+
+data PathLenght = PathLenght Float deriving Show
+
+-- <path_length> ::= <float>
+parsePathLenght :: Parser PathLenght
+parsePathLenght [] = Left "empty input, cannot parse a path length"
+parsePathLenght input = 
+  let
+    pathLenght = parseFloat input
+    in case pathLenght of
+      Left e1 -> Left e1
+      Right (v1, r1) -> Right (PathLenght v1, r1)
+
+data CoordX = CoordX Float deriving Show
+
+-- <coord_x> ::= <float>
+parseCoordX :: Parser CoordX
+parseCoordX [] = Left "empty input, cannot parse a coord x"
+parseCoordX input = 
+  let
+    coordX = parseFloat input
+    in case coordX of
+      Left e1 -> Left e1
+      Right (v1, r1) -> Right (CoordX v1, r1)
+
+data CoordY = CoordY Float deriving Show
+
+-- <coord_y> ::= <float>
+parseCoordY :: Parser CoordY
+parseCoordY [] = Left "empty input, cannot parse a coord y"
+parseCoordY input = 
+  let
+    coordY = parseFloat input
+    in case coordY of
+      Left e1 -> Left e1
+      Right (v1, r1) -> Right (CoordY v1, r1)
+
+data Point = Point CoordX CoordY deriving Show
+
+-- <point> ::= <coord_x> ", " <coord_y>
+parsePoint :: Parser Point
+parsePoint input = (and3' (\a _ b -> Point a b) parseCoordX (parseSeperator) parseCoordY) input
+
+data Name = Name String deriving Show
+
+-- <name> ::= <string>
+parseName :: Parser Name
+parseName [] = Left "empty input, cannot parse a name"
+parseName input = 
+  let
+    name = parseString input
+    in case name of
+      Left e1 -> Left e1
+      Right (v1, r1) -> Right (Name v1, r1)
+
+data PreviousStopId = PreviousStopId StopId deriving Show
+
+-- <previous_stop_id> ::= <stop_id>
+parsePreviousStopId :: Parser PreviousStopId
+parsePreviousStopId [] = Left "empty input, cannot parse a previous stop id"
+parsePreviousStopId input = 
+  let
+    previousStopId = parseStopId input
+    in case previousStopId of
+      Left e1 -> Left e1
+      Right (v1, r1) -> Right (PreviousStopId v1, r1)
+
+data NextStopId = NextStopId StopId deriving Show
+
+-- <next_stop_id> ::= <stop_id>
+parseNextStopId :: Parser NextStopId
+parseNextStopId [] = Left "empty input, cannot parse a next stop id"
+parseNextStopId input = 
+  let
+    nextStopId = parseStopId input
+    in case nextStopId of
+      Left e1 -> Left e1
+      Right (v1, r1) -> Right (NextStopId v1, r1)
+
+data StopOrPath = Stop StopId | Path PathId deriving Show
+
+-- <stop_or_path> ::= <stop_id> | <path_id>
+parseStopOrPath :: Parser StopOrPath
+parseStopOrPath input = 
+  let
+    stopId = parseStopId input
+    in case stopId of
+      Right (v1, r1) -> Right (Stop v1, r1)
+      Left _ -> 
+        let
+          pathId = parsePathId input
+          in case pathId of
+            Right (v1, r1) -> Right (Path v1, r1)
+            Left e1 -> Left e1
 
 -- | An entity which represents your program's state.
 -- Currently it has no constructors but you can introduce
