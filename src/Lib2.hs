@@ -1,4 +1,4 @@
-{-# LANGUAGE InstanceSigs #-}
+
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Redundant lambda" #-}
 module Lib2
@@ -95,14 +95,7 @@ or2 a b = \input ->
                 Right r2 -> Right r2
                 Left e2 -> Left (e1 ++ ", " ++ e2)
 
--- >>> parseExact "abc" "abcdef" 
--- Right ("abc","def")
--- >>> parseExact "." ".def"
--- Right (".","def")
--- >>> parseExact "." "de.f"
--- Left "Expected ."
--- >>> parseExact "" "def"
--- Right ("","def")
+
 parseExact :: String -> Parser String
 parseExact expected input =
   let len = length expected
@@ -110,26 +103,22 @@ parseExact expected input =
        then Right (expected, drop len input)
        else Left $ "Expected " ++ expected
 
--- >>> parseExactInString "." "abc.def"
--- Right (".","def")
--- >>> parseExactInString "." "de.f.a"
--- Right (".","f.a")
--- >>> parseExactInString "." "123.123"
--- Right (".","123")
-parseExactInString :: String -> Parser String
-parseExactInString str [] = Left "Empty input, cannot parse a string"
-parseExactInString str input =  
-  let 
-    letters = L.takeWhile (\c -> C.isLetter c || C.isNumber c) input
-    rest = drop (length letters) input
-  in 
-    case parseExact str rest of
-      Right (v1, r1) -> Right (v1, r1)
-      Left e1 -> Left e1
+
+checkIfStringIsInString :: String -> Parser (String, String)
+checkIfStringIsInString str [] = Left "Empty input, cannot parse a string"
+checkIfStringIsInString str input = parseExactInString' ([], str) input
+  where
+    parseExactInString' (_, _) []  = Left ("Cannot find " ++ str ++ " in the input")
+    parseExactInString' (acc, str') s@(h:t)  =
+        case parseExact str' s of
+          Right (v1, r1) -> Right ((acc, v1), r1)
+          Left _ -> parseExactInString' (acc ++ [h], str') t
+
 
 parseChar :: Char -> Parser Char
 parseChar c [] = Left ("Cannot find " ++ [c] ++ " in an empty input")
 parseChar c s@(h:t) = if c == h then Right (c, t) else Left (c : " is not found in " ++ s)
+
 
 -- <character> ::= [1-9] | [A-Z] | [a-z] | "_"
 parseLetter :: Parser Char
@@ -138,31 +127,23 @@ parseLetter s@(h:t) = if C.isLetter h || h == '_' then Right (h, t) else Left (s
 
 
 -- <string> ::= <character> <string> | <character>
--- >>> parseString "abc"
--- Right ("abc","")
--- >>> parseString "abc123"
--- Right ("abc","123")
--- >>> parseString "afeafe45"
-parseString :: Parser [Char]
-parseString = many parseLetter 
+parseString :: Parser String
+parseString = many parseLetter
 
 
 -- ", "
 parseSeperator :: Parser String
 parseSeperator input =
-      case parseExactInString ", " input of
-        Right(v2, r2) -> Right(v2, r2)
-        Left e1 -> Left(e1)
+      case parseExact ", " input of
+        Left e1 -> Left e1
+        Right(v2, r2) -> Right (v2, r2)
 
-
+-- "."
 parseDotSeperator :: Parser String
 parseDotSeperator input =
-  case parseExactInString "." input of
+  case parseExact "." input of
     Left e1 -> Left e1
-    Right (v1, r1) -> 
-      case parseExactInString "." r1 of
-        Right _ -> Left "too many dots"
-        Left _ -> Right (v1, r1)
+    Right (v1, r1) -> Right (v1, r1)
 
 
 -- <integer>
@@ -177,24 +158,29 @@ parseInteger input =
             [] -> Left "not an integer"
             _ -> Right (read digits, rest)
 
+
 -- <pos>
 parsePositiveFloat :: Parser Float
 parsePositiveFloat [] = Left "empty input, cannot parse a float"
 parsePositiveFloat input =
-    let
-      isSeperatorOne = parseDotSeperator input
-    in
-      case isSeperatorOne of
-        Right (_, _) -> 
-          let
-            digits = L.takeWhile (\c -> C.isDigit c || c == '.') input
-            rest = drop (length digits) input
-          in
-              case digits of
-                [] -> Left "not a float"
-                _ -> Right (read digits, rest)
+   let
+      integerPart = parseInteger input
+      rest = case integerPart of
         Left e1 -> Left e1
-       
+        Right (v1, r) -> 
+          case parseDotSeperator r of
+            Left e2 -> Left e2
+            Right (_, r2) -> 
+              case parseInteger r2 of
+                Left e3 -> Left e3
+                Right (v3, r3) -> Right ((v1, v3), r3)
+    in case rest of
+      Left _ -> 
+        case integerPart of
+          Left e1 -> Left e1
+          Right (v1, r1) -> Right (fromIntegral v1, r1)
+      Right (v1, r1) -> Right (read (show (fst v1) ++ "." ++ show (snd v1)), r1)
+
 
 -- <float>
 parseFloat :: Parser Float
@@ -204,11 +190,11 @@ parseFloat input =
     sign = parseChar '-' input
   in
     case sign of
-      Right (_, r1) -> 
+      Right (_, r1) ->
         case parsePositiveFloat r1 of
           Right (v2, r2) -> Right (-v2, r2)
           Left e2 -> Left e2
-      Left _ -> 
+      Left _ ->
         case parsePositiveFloat input of
           Right (v2, r2) -> Right (v2, r2)
           Left e2 -> Left e2

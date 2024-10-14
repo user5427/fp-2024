@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Redundant lambda" #-}
 import qualified Data.Char as C
 import qualified Data.List as L
 
