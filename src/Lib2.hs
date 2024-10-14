@@ -11,6 +11,7 @@ module Lib2
 
 import qualified Data.Char as C
 import qualified Data.List as L
+import Data.Functor.Classes (eq1)
 
 -- | An entity which represets user input.
 -- It should match the grammar from Laboratory work #1.
@@ -62,37 +63,6 @@ many p = many' p []
             case p' input of
                 Left _ -> Right (acc, input)
                 Right (v, r) -> many' p' (acc ++ [v]) r
-
-
--- >>> parseManyFunctions [parseName, (parseChar ' '), parseName] "JonasJonas jonelis"
--- Couldn't match type `Char' with `Name'
--- Expected: Parser Name
---   Actual: Parser Char
--- In the expression: parseChar ' '
--- In the first argument of `parseManyFunctions', namely
---   `[parseName, (parseChar ' '), parseName]'
--- In the expression:
---   parseManyFunctions
---     [parseName, (parseChar ' '), parseName] "JonasJonas jonelis"
--- Define a sum type to hold both Names and Chars
--- data NameOrChar = NameResult Name | CharResult Char deriving (Show)
-
--- Adapt your parsers to return this type
-
-parseManyFunctions :: [Parser a] -> Parser [a]
-parseManyFunctions [] _ = Left "empty input, cannot parse a number" -- Accepts two arguments
-parseManyFunctions funct input = many' funct input [] -- Consistent two-argument pattern
-  where
-    many' [] s acc = Right (acc, s) -- Base case: if no more parsers, return accumulated results
-    many' (f:fs) s acc =
-      case f s of
-        Right (v1, r1) -> many' fs r1 (acc ++ [v1]) -- Apply parser, continue with the rest
-        Left _ -> Right (acc, s) -- If a parser fails, return accumulated results so far
-
-
-
-  
-
 
 and2 :: Parser a -> Parser b -> Parser (a, b)
 and2 a b = \input ->
@@ -208,15 +178,15 @@ parsePositiveFloat input =
       integerPart = parseInteger input
       rest = case integerPart of
         Left e1 -> Left e1
-        Right (v1, r) -> 
+        Right (v1, r) ->
           case parseDotSeperator r of
             Left e2 -> Left e2
-            Right (_, r2) -> 
+            Right (_, r2) ->
               case parseInteger r2 of
                 Left e3 -> Left e3
                 Right (v3, r3) -> Right ((v1, v3), r3)
     in case rest of
-      Left _ -> 
+      Left _ ->
         case integerPart of
           Left e1 -> Left e1
           Right (v1, r1) -> Right (fromIntegral v1, r1)
@@ -240,14 +210,20 @@ parseFloat input =
           Right (v2, r2) -> Right (v2, r2)
           Left e2 -> Left e2
 
+getStringFromParser :: Parser String -> Parser String
+getStringFromParser parser input =
+  let
+    result = parser input
+    in case result of
+      Left e1 -> Left e1
+      Right (v1, r1) -> Right (v1, r1)
+
 data TripId = TripId Char Int deriving Show
 
 -- <trip_id> ::= "T" <integer>
--- >>> parseTripId "T123"
--- Right (TripId 'T' 123,"")
 parseTripId :: Parser TripId
 parseTripId [] = Left "empty input, cannot parse a trip id"
-parseTripId input = 
+parseTripId input =
   let
     typeChar = parseChar 'T' input
     in case typeChar of
@@ -264,7 +240,7 @@ data RouteId = RouteId Char Int deriving Show
 -- <route_id> ::= <integer>
 parseRouteId :: Parser RouteId
 parseRouteId [] = Left "empty input, cannot parse a route id"
-parseRouteId input = 
+parseRouteId input =
   let
     typeChar = parseChar 'R' input
     in case typeChar of
@@ -281,7 +257,7 @@ data StopId = StopId Char Int deriving Show
 -- <stop_id> ::= <integer>
 parseStopId :: Parser StopId
 parseStopId [] = Left "empty input, cannot parse a stop id"
-parseStopId input = 
+parseStopId input =
   let
     typeChar = parseChar 'S' input
     in case typeChar of
@@ -293,12 +269,28 @@ parseStopId input =
             Left e1 -> Left e1
             Right (v1, r2) -> Right (StopId v0 (fromIntegral v1), r2)
 
+-- <list_of_stop_ids> ::= <stop_id> "," <list_of_stop_ids> | <stop_id>
+-- >>> parseStopIdList "S1, S2, S3"
+-- Right ([StopId 'S' 1,StopId 'S' 2,StopId 'S' 3],"")
+parseStopIdList :: Parser [StopId]
+parseStopIdList [] = Left "empty input, cannot parse a stop id list"
+parseStopIdList input = many' input []
+  where
+    many' [] acc = Right (acc, [])
+    many' input acc =
+      case parseStopId input of
+        Right (v1, r1) -> many' r1 (acc ++ [v1])
+        Left _ -> 
+          case parseSeperator input of
+            Right (_, r1) -> many' r1 acc
+            Left e1 -> Right (acc, input)
+
 data PathId = PathId Char Int deriving Show
 
 -- <path_id> ::= <integer>
 parsePathId :: Parser PathId
 parsePathId [] = Left "empty input, cannot parse a path id"
-parsePathId input = 
+parsePathId input =
   let
     typeChar = parseChar 'P' input
     in case typeChar of
@@ -315,7 +307,7 @@ data PathLenght = PathLenght Float deriving Show
 -- <path_length> ::= <float>
 parsePathLenght :: Parser PathLenght
 parsePathLenght [] = Left "empty input, cannot parse a path length"
-parsePathLenght input = 
+parsePathLenght input =
   let
     pathLenght = parseFloat input
     in case pathLenght of
@@ -327,7 +319,7 @@ data CoordX = CoordX Float deriving Show
 -- <coord_x> ::= <float>
 parseCoordX :: Parser CoordX
 parseCoordX [] = Left "empty input, cannot parse a coord x"
-parseCoordX input = 
+parseCoordX input =
   let
     coordX = parseFloat input
     in case coordX of
@@ -339,7 +331,7 @@ data CoordY = CoordY Float deriving Show
 -- <coord_y> ::= <float>
 parseCoordY :: Parser CoordY
 parseCoordY [] = Left "empty input, cannot parse a coord y"
-parseCoordY input = 
+parseCoordY input =
   let
     coordY = parseFloat input
     in case coordY of
@@ -357,7 +349,7 @@ data Name = Name String deriving Show
 -- <name> ::= <string>
 parseName :: Parser Name
 parseName [] = Left "empty input, cannot parse a name"
-parseName input = 
+parseName input =
   let
     name = parseString input
     in case name of
@@ -369,7 +361,7 @@ data PreviousStopId = PreviousStopId StopId deriving Show
 -- <previous_stop_id> ::= <stop_id>
 parsePreviousStopId :: Parser PreviousStopId
 parsePreviousStopId [] = Left "empty input, cannot parse a previous stop id"
-parsePreviousStopId input = 
+parsePreviousStopId input =
   let
     previousStopId = parseStopId input
     in case previousStopId of
@@ -381,54 +373,246 @@ data NextStopId = NextStopId StopId deriving Show
 -- <next_stop_id> ::= <stop_id>
 parseNextStopId :: Parser NextStopId
 parseNextStopId [] = Left "empty input, cannot parse a next stop id"
-parseNextStopId input = 
+parseNextStopId input =
   let
     nextStopId = parseStopId input
     in case nextStopId of
       Left e1 -> Left e1
       Right (v1, r1) -> Right (NextStopId v1, r1)
 
-data StopOrPath = StopID StopId | PathID PathId deriving Show
+data StopOrPath = StopId' StopId
+                  | PathId' PathId deriving Show
 
 -- <stop_or_path> ::= <stop_id> | <path_id>
 parseStopOrPath :: Parser StopOrPath
-parseStopOrPath input = 
+parseStopOrPath input =
   let
     stopId = parseStopId input
     in case stopId of
-      Right (v1, r1) -> Right (StopID v1, r1)
-      Left _ -> 
+      Right (v1, r1) -> Right (StopId' v1, r1)
+      Left _ ->
         let
           pathId = parsePathId input
           in case pathId of
-            Right (v1, r1) -> Right (PathID v1, r1)
+            Right (v1, r1) -> Right (PathId' v1, r1)
             Left e1 -> Left e1
 
+parseStopOrPathList :: Parser [StopOrPath]
+parseStopOrPathList [] = Left "empty input, cannot parse a stop or path list"
+parseStopOrPathList input = many' input []
+  where
+    many' [] acc = Right (acc, [])
+    many' input acc =
+      case parseStopOrPath input of
+        Right (v1, r1) -> many' r1 (acc ++ [v1])
+        Left _ -> 
+          case parseSeperator input of
+            Right (_, r1) -> many' r1 acc
+            Left e1 -> Right (acc, input)
 
--- >>> parseManyFunctions [parseString, parseSeperator, parseString] "Jonas, Jonas"
--- Right (["Jonas",", ","Jonas"],"")
+data Stop = Stop StopId Name Point deriving Show
 
--- >>> skipEmptySpace [" ", "Jonas", "Jonas", "jonelis"]
+-- <create_stop> ::= "create_stop(" <stop_id> ", " <name> ", " <point> ")"
+parseCreateStop :: Parser Stop
+parseCreateStop [] = Left "empty input, cannot parse a create stop"
+parseCreateStop input =
+  let
+    res = and3' (\a b c -> Stop a b c)
+          (and3' (\_ b _ -> b) (parseExact "create_stop(") parseStopId parseSeperator)
+          parseName
+          (and3' (\_ c _ -> c) parseSeperator parsePoint (parseExact ")")) input
+    in case res of
+    Left e1 -> Left e1
+    Right (r1, v1) -> Right (r1, v1)
+
+data Route = Route RouteId Name [StopId] deriving Show
+
+-- <create_route> ::= "create_route(" <route_id> ", " <name> ", " <list_of_stop_ids> ")"
+parseCreateRoute :: Parser Route
+parseCreateRoute [] = Left "empty input, cannot parse a create route"
+parseCreateRoute input =
+  let
+    res = and3' (\a b c -> Route a b c)
+          (and3' (\_ b _ -> b) (parseExact "create_route(") parseRouteId parseSeperator)
+          parseName
+          (and3' (\_ c _ -> c) parseSeperator parseStopIdList (parseExact ")")) input
+    in case res of
+    Left e1 -> Left e1
+    Right (r1, v1) -> Right (r1, v1)
+
+-- data 
+
+-- <stop_or_path_or_creat> ::= <create_stop> | <stop_or_path> | <find_next_stop>
+data StopOrPathOrCreate = StopOrPath' StopOrPath
+                        | CreateStop' Stop deriving Show
+
+-- >>> parseStopOrPathOrCreate "create_stop(S1, Jonas, 1.0, 2.0)"
+-- Right (CreateStop' (Stop (StopId 'S' 1) (Name "Jonas") (Point (CoordX 1.0) (CoordY 2.0))),"")
+
+parseStopOrPathOrCreate :: Parser StopOrPathOrCreate
+parseStopOrPathOrCreate [] = Left "empty input, cannot parse a stop or path or create"
+parseStopOrPathOrCreate input =
+  let
+    stopOrPath = parseStopOrPath input
+    in case stopOrPath of
+      Right (v1, r1) -> Right (StopOrPath' v1, r1)
+      Left _ ->
+        let
+          createStop = parseCreateStop input
+          in case createStop of
+            Right (v1, r1) -> Right (CreateStop' v1, r1)
+            Left e1 -> Left e1
+
+-- <list_of_stops_paths_creat> ::= <stop_or_path_or_creat> "," <list_of_stops_paths_creat> | <stop_or_path_or_creat> 
+parseStopOrPathOrCreateList :: Parser [StopOrPathOrCreate]
+parseStopOrPathOrCreateList [] = Left "empty input, cannot parse a stop or path or create list"
+parseStopOrPathOrCreateList input = many' input []
+  where
+    many' [] acc = Right (acc, [])
+    many' input acc =
+      case parseStopOrPathOrCreate input of
+        Right (v1, r1) -> many' r1 (acc ++ [v1])
+        Left _ -> 
+          case parseSeperator input of
+            Right (_, r1) -> many' r1 acc
+            Left e1 -> Right (acc, input)
+
+
+
+
+
+data Trip = Trip TripId Name [StopOrPathOrCreate] deriving Show
+
+-- <create_trip> ::= "create_trip(" <trip_id> ", " <name> ", " <list_of_stops_paths_creat> ")"
+parseCreateTrip :: Parser Trip
+parseCreateTrip [] = Left "empty input, cannot parse a create trip"
+parseCreateTrip input =
+  let
+    res = and3' (\a b c -> Trip a b c)
+          (and3' (\_ b _ -> b) (parseExact "create_trip(") parseTripId parseSeperator)
+          parseName
+          (and3' (\_ c _ -> c) parseSeperator parseStopOrPathOrCreateList (parseExact ")")) input
+    in case res of
+    Left e1 -> Left e1
+    Right (r1, v1) -> Right (r1, v1)
+
+data Path = Path PathId Name PathLenght StopId StopId deriving Show
+
+-- <create_path> ::= "create_path(" <path_id> ", " <name> ", " <path_length> ", " <stop_id> ", " <stop_id> ")"
+parseCreatePath :: Parser Path
+parseCreatePath [] = Left "empty input, cannot parse a create path"
+parseCreatePath input =
+  let
+    res = and3' (\a b c -> Path a (fst b) (snd b) (fst c) (snd c))
+          (and3' (\_ b _ -> b) (parseExact "create_path(") parsePathId parseSeperator)
+          (and3' (\a b _ -> (a, b)) parseName (and2' (\_ b -> b) parseSeperator parsePathLenght) parseSeperator)
+          (and3' (\a b _ -> (a, b)) parseStopId (and2' (\_ b -> b) parseSeperator parseStopId) (parseExact ")") ) input
+    in case res of
+    Left e1 -> Left e1
+    Right (r1, v1) -> Right (r1, v1)
+
+
+-- | An entity which represents your program's state.
+-- Currently it has no constructors but you can introduce
+-- as many as needed.
+data State
+
+-- | Creates an initial program's state.
+-- It is called once when the program starts.
+emptyState :: State
+emptyState = error "Not implemented 1"
+
+-- | Updates a state according to a query.
+-- This allows your program to share the state
+-- between repl iterations.
+-- Right contains an optional message to print and
+-- an updated program's state.
+stateTransition :: State -> Query -> Either String (Maybe String, State)
+stateTransition _ _ = Left "Not implemented 3"
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 -- >>> skipElements ["Jonas", "Jonas", "jonelis", "galva skauda"] "Jonas"
 -- Right (["jonelis","galva skauda"],"")
-skipElements :: [String] -> Parser [String]
-skipElements input skip = 
-      let
-        skipy = many' skip [] input
-        in case skipy of
-          Left e1 -> Left e1
-          Right (v2, r2) -> Right (v2, r2)
-      where 
-        many' [] acc _ = Left "empty remove element"
-        many' rem acc [] = Right (acc, [])
-        many' rem acc s@(h:t) = 
-          if rem == h
-            then many' rem acc t
-            else many' rem (acc ++ [h]) t
+
+-- nenaudoti
+-- removeElements :: [String] -> Parser [String]
+-- removeElements input skip = 
+--       let
+--         skipy = many' skip [] input
+--         in case skipy of
+--           Left e1 -> Left e1
+--           Right (v2, r2) -> Right (v2, r2)
+--       where 
+--         many' [] acc _ = Left "empty remove element"
+--         many' rem acc [] = Right (acc, [])
+--         many' rem acc s@(h:t) = 
+--           if rem == h
+--             then many' rem acc t
+--             else many' rem (acc ++ [h]) t
 
 
-
+-- nenaudoti
 -- parseFunctionArguments :: String -> Parser [String]
 -- parseFunctionArguments com = 
 --   let 
@@ -453,59 +637,52 @@ skipElements input skip =
 --                         Right (_, v3) -> Right (v1, v3)
 
 
-data Stop = Stop StopId Name Point deriving Show
 
 
--- <create_stop> ::= "create_stop(" <stop_id> ", " <name> ", " <point> ")"
--- >>> parseCreateStop "create_stop(S123, Jonas, 1.0, 2.0)"
--- Left "not an integer"
+-- bandymas parasyti geresnius dalykus
+-- data NameOrChar = CharResult Char
+--                 | StringResult String
+--                 | FloatResult Float
+--                 | IntResult Int
+--                 | TripResult TripId
+--                 | RouteResult RouteId
+--                 | StopResult StopId
+--                 | PathResult PathId
+--                 | PathLenghtResult PathLenght
+--                 | CoordXResult CoordX
+--                 | CoordYResult CoordY
+--                 | PointResult Point
+--                 | NameResult Name
+--                 | PreviousStopIdResult PreviousStopId
+--                 | NextStopIdResult NextStopId
+--                 | StopOrPathResult StopOrPath
+--                 deriving Show
 
-
-parseCreateStop :: Parser Stop
-parseCreateStop [] = Left "empty input, cannot parse a create stop"
-parseCreateStop input = 
-  let 
-    createStop = parseExact "create_stop(" input
-    in case createStop of
-      Left e1 -> Left e1
-      Right (_, r1) -> 
-        let
-          stopId = parseStopId r1
-          in case stopId of
-            Left e1 -> Left e1
-            Right (v1, r2) -> 
-              let
-                name = parseName r2
-                in case name of
-                  Left e1 -> Left e1
-                  Right (v2, r3) -> 
-                    let
-                      point = parsePoint r3
-                      in case point of
-                        Left e1 -> Left e1
-                        Right (v3, r4) -> 
-                          let
-                            closeBracket = parseExact ")" r4
-                            in case closeBracket of
-                              Left e1 -> Left e1
-                              Right (_, r5) -> Right (Stop v1 v2 v3, r5)
-
-
-
--- | An entity which represents your program's state.
--- Currently it has no constructors but you can introduce
--- as many as needed.
-data State
-
--- | Creates an initial program's state.
--- It is called once when the program starts.
-emptyState :: State
-emptyState = error "Not implemented 1"
-
--- | Updates a state according to a query.
--- This allows your program to share the state
--- between repl iterations.
--- Right contains an optional message to print and
--- an updated program's state.
-stateTransition :: State -> Query -> Either String (Maybe String, State)
-stateTransition _ _ = Left "Not implemented 3"
+-- >>> parseManyFunctions [parseName, parseSeperator, parseString] "Jonas, Jonas"
+-- Couldn't match type `[Char]' with `Name'
+-- Expected: Parser Name
+--   Actual: Parser String
+-- In the expression: parseString
+-- In the first argument of `parseManyFunctions', namely
+--   `[parseName, parseSeperator, parseString]'
+-- In the expression:
+--   parseManyFunctions
+--     [parseName, parseSeperator, parseString] "Jonas, Jonas"
+-- Couldn't match type `[Char]' with `Name'
+-- Expected: Parser Name
+--   Actual: Parser String
+-- In the expression: parseSeperator
+-- In the first argument of `parseManyFunctions', namely
+--   `[parseName, parseSeperator, parseString]'
+-- In the expression:
+--   parseManyFunctions
+--     [parseName, parseSeperator, parseString] "Jonas, Jonas"
+parseManyFunctions :: [Parser a] -> Parser [a]
+parseManyFunctions [] _ = Left "empty input, cannot parse a number" -- Accepts two arguments
+parseManyFunctions funct input = many' funct input [] -- Consistent two-argument pattern
+  where
+    many' [] s acc = Right (acc, s) -- Base case: if no more parsers, return accumulated results
+    many' (f:fs) s acc =
+      case f s of
+        Right (v1, r1) -> many' fs r1 (acc ++ [v1]) -- Apply parser, continue with the rest
+        Left _ -> Right (acc, s) -- If a parser fails, return accumulated results so far
