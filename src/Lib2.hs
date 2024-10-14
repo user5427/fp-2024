@@ -53,11 +53,6 @@ parseQuery _ = Left "Not implemented 2"
 
 
 
-
-
-
-
-
 type Parser a = String -> Either String (a, String)
 
 many :: Parser a -> Parser [a]
@@ -67,6 +62,37 @@ many p = many' p []
             case p' input of
                 Left _ -> Right (acc, input)
                 Right (v, r) -> many' p' (acc ++ [v]) r
+
+
+-- >>> parseManyFunctions [parseName, (parseChar ' '), parseName] "JonasJonas jonelis"
+-- Couldn't match type `Char' with `Name'
+-- Expected: Parser Name
+--   Actual: Parser Char
+-- In the expression: parseChar ' '
+-- In the first argument of `parseManyFunctions', namely
+--   `[parseName, (parseChar ' '), parseName]'
+-- In the expression:
+--   parseManyFunctions
+--     [parseName, (parseChar ' '), parseName] "JonasJonas jonelis"
+-- Define a sum type to hold both Names and Chars
+-- data NameOrChar = NameResult Name | CharResult Char deriving (Show)
+
+-- Adapt your parsers to return this type
+
+parseManyFunctions :: [Parser a] -> Parser [a]
+parseManyFunctions [] _ = Left "empty input, cannot parse a number" -- Accepts two arguments
+parseManyFunctions funct input = many' funct input [] -- Consistent two-argument pattern
+  where
+    many' [] s acc = Right (acc, s) -- Base case: if no more parsers, return accumulated results
+    many' (f:fs) s acc =
+      case f s of
+        Right (v1, r1) -> many' fs r1 (acc ++ [v1]) -- Apply parser, continue with the rest
+        Left _ -> Right (acc, s) -- If a parser fails, return accumulated results so far
+
+
+
+  
+
 
 and2 :: Parser a -> Parser b -> Parser (a, b)
 and2 a b = \input ->
@@ -231,7 +257,7 @@ parseTripId input =
           tripId = parseInteger r1
           in case tripId of
             Left e1 -> Left e1
-            Right (v1, r1) -> Right (TripId v0 (fromIntegral v1), r1)
+            Right (v1, r2) -> Right (TripId v0 (fromIntegral v1), r2)
 
 data RouteId = RouteId Char Int deriving Show
 
@@ -248,7 +274,7 @@ parseRouteId input =
           tripId = parseInteger r1
           in case tripId of
             Left e1 -> Left e1
-            Right (v1, r1) -> Right (RouteId v0 (fromIntegral v1), r1)
+            Right (v1, r2) -> Right (RouteId v0 (fromIntegral v1), r2)
 
 data StopId = StopId Char Int deriving Show
 
@@ -265,7 +291,7 @@ parseStopId input =
           tripId = parseInteger r1
           in case tripId of
             Left e1 -> Left e1
-            Right (v1, r1) -> Right (StopId v0 (fromIntegral v1), r1)
+            Right (v1, r2) -> Right (StopId v0 (fromIntegral v1), r2)
 
 data PathId = PathId Char Int deriving Show
 
@@ -282,7 +308,7 @@ parsePathId input =
           tripId = parseInteger r1
           in case tripId of
             Left e1 -> Left e1
-            Right (v1, r1) -> Right (PathId v0 (fromIntegral v1), r1)
+            Right (v1, r2) -> Right (PathId v0 (fromIntegral v1), r2)
 
 data PathLenght = PathLenght Float deriving Show
 
@@ -362,7 +388,7 @@ parseNextStopId input =
       Left e1 -> Left e1
       Right (v1, r1) -> Right (NextStopId v1, r1)
 
-data StopOrPath = Stop StopId | Path PathId deriving Show
+data StopOrPath = StopID StopId | PathID PathId deriving Show
 
 -- <stop_or_path> ::= <stop_id> | <path_id>
 parseStopOrPath :: Parser StopOrPath
@@ -370,13 +396,101 @@ parseStopOrPath input =
   let
     stopId = parseStopId input
     in case stopId of
-      Right (v1, r1) -> Right (Stop v1, r1)
+      Right (v1, r1) -> Right (StopID v1, r1)
       Left _ -> 
         let
           pathId = parsePathId input
           in case pathId of
-            Right (v1, r1) -> Right (Path v1, r1)
+            Right (v1, r1) -> Right (PathID v1, r1)
             Left e1 -> Left e1
+
+
+-- >>> parseManyFunctions [parseString, parseSeperator, parseString] "Jonas, Jonas"
+-- Right (["Jonas",", ","Jonas"],"")
+
+-- >>> skipEmptySpace [" ", "Jonas", "Jonas", "jonelis"]
+
+-- >>> skipElements ["Jonas", "Jonas", "jonelis", "galva skauda"] "Jonas"
+-- Right (["jonelis","galva skauda"],"")
+skipElements :: [String] -> Parser [String]
+skipElements input skip = 
+      let
+        skipy = many' skip [] input
+        in case skipy of
+          Left e1 -> Left e1
+          Right (v2, r2) -> Right (v2, r2)
+      where 
+        many' [] acc _ = Left "empty remove element"
+        many' rem acc [] = Right (acc, [])
+        many' rem acc s@(h:t) = 
+          if rem == h
+            then many' rem acc t
+            else many' rem (acc ++ [h]) t
+
+
+
+-- parseFunctionArguments :: String -> Parser [String]
+-- parseFunctionArguments com = 
+--   let 
+--     parseCom = parseExact com
+--     in case parseCom of
+--       Left e1 -> Left e1
+--       Right (_, v1) - 
+--         let
+--           openBracket = parseExact "(" v1
+--           in case openBracket of
+--             Left e1 -> Left e1
+--             Right (_, v2) -> 
+--               let
+--                 arguments = parseManyFunctions [parseString, parseSeperator] v2
+--                 in case arguments of
+--                   Left e1 -> Left e1
+--                   Right (v1, v2) -> 
+--                     let
+--                       closeBracket = parseExact ")" v2
+--                       in case closeBracket of
+--                         Left e1 -> Left e1
+--                         Right (_, v3) -> Right (v1, v3)
+
+
+data Stop = Stop StopId Name Point deriving Show
+
+
+-- <create_stop> ::= "create_stop(" <stop_id> ", " <name> ", " <point> ")"
+-- >>> parseCreateStop "create_stop(S123, Jonas, 1.0, 2.0)"
+-- Left "not an integer"
+
+
+parseCreateStop :: Parser Stop
+parseCreateStop [] = Left "empty input, cannot parse a create stop"
+parseCreateStop input = 
+  let 
+    createStop = parseExact "create_stop(" input
+    in case createStop of
+      Left e1 -> Left e1
+      Right (_, r1) -> 
+        let
+          stopId = parseStopId r1
+          in case stopId of
+            Left e1 -> Left e1
+            Right (v1, r2) -> 
+              let
+                name = parseName r2
+                in case name of
+                  Left e1 -> Left e1
+                  Right (v2, r3) -> 
+                    let
+                      point = parsePoint r3
+                      in case point of
+                        Left e1 -> Left e1
+                        Right (v3, r4) -> 
+                          let
+                            closeBracket = parseExact ")" r4
+                            in case closeBracket of
+                              Left e1 -> Left e1
+                              Right (_, r5) -> Right (Stop v1 v2 v3, r5)
+
+
 
 -- | An entity which represents your program's state.
 -- Currently it has no constructors but you can introduce
