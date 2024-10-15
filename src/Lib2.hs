@@ -359,30 +359,6 @@ parseName input =
       Left e1 -> Left e1
       Right (v1, r1) -> Right (Name v1, r1)
 
-data PreviousStopId = PreviousStopId StopId deriving Show
-
--- <previous_stop_id> ::= <stop_id>
-parsePreviousStopId :: Parser PreviousStopId
-parsePreviousStopId [] = Left "empty input, cannot parse a previous stop id"
-parsePreviousStopId input =
-  let
-    previousStopId = parseStopId input
-    in case previousStopId of
-      Left e1 -> Left e1
-      Right (v1, r1) -> Right (PreviousStopId v1, r1)
-
-data NextStopId = NextStopId StopId deriving Show
-
--- <next_stop_id> ::= <stop_id>
-parseNextStopId :: Parser NextStopId
-parseNextStopId [] = Left "empty input, cannot parse a next stop id"
-parseNextStopId input =
-  let
-    nextStopId = parseStopId input
-    in case nextStopId of
-      Left e1 -> Left e1
-      Right (v1, r1) -> Right (NextStopId v1, r1)
-
 data StopOrPath = StopId' StopId
                   | PathId' PathId deriving (Show, Eq)
 
@@ -538,15 +514,45 @@ data State = State {
 emptyState :: State
 emptyState = State [] [] [] []
 
+getByIndexFromArray :: Eq a => Int -> [a] -> Either String a
+getByIndexFromArray index arr = getByIndexFromArray' index arr 0
+  where
+    getByIndexFromArray' _ [] _ = Left "Element not found"
+    getByIndexFromArray' index' (h:t) i = if index' == i then Right h else getByIndexFromArray' index' t (i + 1)
+
+getIndexFromArray :: Eq a => a -> [a] -> Either String Int
+getIndexFromArray target arr = getIndexFromArray' target arr 0
+  where
+    getIndexFromArray' _ [] _ = Left "Element not found"
+    getIndexFromArray' target' (h:t) index = if target' == h then Right index else getIndexFromArray' target' t (index + 1)  
+
+addToArray :: Eq a => a -> [a] -> Either String [a]
+addToArray = addToArray' []
+  where
+    addToArray' acc target [] = Right (acc ++ [target])
+    addToArray' acc target (h:t) = if target == h then Left "Element already exists" else Right (acc ++ [h] ++ t)
+
+updateArray :: Eq a => a -> a -> [a] ->  Either String [a]
+updateArray = updateArray' []
+  where
+    updateArray' _ _ _ [] = Left "Element not found"
+    updateArray' acc target new (h:t) = if target == h then Right (acc ++ [new] ++ t) else updateArray' (acc ++ [h]) target new t
+
+deleteFromArray :: Eq a => a -> [a] -> Either String [a]
+deleteFromArray = deleteFromArray' []
+  where
+    deleteFromArray' _ _ [] = Left "Element not found"
+    deleteFromArray' acc target (h:t) = if target == h then Right (acc ++ t) else deleteFromArray' (acc ++ [h]) target t
+
+
 
 addTrip :: Trip -> State -> Either String State
 addTrip trip state = 
   let 
-    tripId = case trip of
-      Trip tid _ _ -> tid
-    in case getTrip tripId state of
-      Left _ -> Right state {trips = trips state ++ [trip]}
-      Right _ -> Left "Trip already exists"
+    trips' = addToArray trip (trips state)
+    in case trips' of
+      Left e1 -> Left e1
+      Right v1 -> Right state {trips = v1}
 
 getTrip :: TripId -> State -> Either String Trip
 getTrip targetId state = getTrip' targetId (trips state)
@@ -559,40 +565,39 @@ getTrip targetId state = getTrip' targetId (trips state)
 updateTrip :: Trip -> State -> Either String State
 updateTrip trip state = 
   let 
-    tripId = case trip of
-      Trip tid _ _ -> tid
-    in case getTrip tripId state of
+    target = getTrip (case trip of Trip tid _ _ -> tid) state
+    in case target of
       Left _ -> Left "Trip not found"
-      Right _ -> Right state {trips = map (\t -> if t == trip then trip else t) (trips state)}
+      Right e1 -> 
+        let
+          trips' = updateArray e1 trip (trips state)
+          in case trips' of
+            Left e1' -> Left e1'
+            Right v1 -> Right state {trips = v1}
 
 deleteTrip :: TripId -> State -> Either String State
 deleteTrip targetId state = 
   let 
-    trip = getTrip targetId state
-    in case trip of
+    target = getTrip targetId state
+    in case target of
       Left _ -> Left "Trip not found"
-      Right _ -> 
+      Right e1 -> 
         let
-          newTrips = deleteTrip' targetId (trips state) []
-        in case newTrips of
-          Left e1 -> Left e1
-          Right state' -> Right state'
-        where
-          deleteTrip' _ [] acc = Right state {trips = acc}
-          deleteTrip' targetId' (Trip tid n sp : rest) acc
-            | targetId' == tid = deleteTrip' targetId' rest acc
-            | otherwise        = deleteTrip' targetId' rest (acc ++ [Trip tid n sp])
+          trips' = deleteFromArray e1 (trips state)
+          in case trips' of
+            Left e1' -> Left e1'
+            Right v1 -> Right state {trips = v1}
+
 
 
 addStop :: Stop -> State -> Either String State
 -- addStop stop state = state {stops = stops state ++ [stop]}
 addStop stop state = 
   let 
-    stopId = case stop of
-      Stop sid _ _ _ _ -> sid
-    in case getStop stopId state of
-      Left _ -> Right state {stops = stops state ++ [stop]}
-      Right _ -> Left "Stop already exists"
+    stops' = addToArray stop (stops state)
+    in case stops' of
+      Left e1 -> Left e1
+      Right v1 -> Right state {stops = v1}
 
 getStop :: StopId -> State -> Either String Stop
 getStop targetId state = getStop' targetId (stops state)
@@ -602,14 +607,40 @@ getStop targetId state = getStop' targetId (stops state)
       | targetId' == sid = Right (Stop sid name point prevStops nextStops)
       | otherwise       = getStop' targetId' rest
 
+updateStop :: Stop -> State -> Either String State
+updateStop stop state = 
+  let 
+    target = getStop (case stop of Stop sid _ _ _ _ -> sid) state
+    in case target of
+      Left _ -> Left "Stop not found"
+      Right e1 -> 
+        let
+          stops' = updateArray e1 stop (stops state)
+          in case stops' of
+            Left e1' -> Left e1'
+            Right v1 -> Right state {stops = v1}
+
+deleteStop :: StopId -> State -> Either String State
+deleteStop targetId state = 
+  let 
+    stop = getStop targetId state
+    in case stop of
+      Left _ -> Left "Stop not found"
+      Right e1 -> 
+        let
+          stops' = deleteFromArray e1 (stops state)
+          in case stops' of
+            Left e1' -> Left e1'
+            Right v1 -> Right state {stops = v1}
+
+
 addRoute :: Route -> State -> Either String State
 addRoute route state = 
   let 
-    routeId = case route of
-      Route rid _ _ -> rid
-    in case getRoute routeId state of
-      Left _ -> Right state {routes = routes state ++ [route]}
-      Right _ -> Left "Route already exists"
+    routes' = addToArray route (routes state)
+    in case routes' of
+      Left e1 -> Left e1
+      Right v1 -> Right state {routes = v1}
 
 getRoute :: RouteId -> State -> Either String Route
 getRoute targetId state = getRoute' targetId (routes state)
@@ -619,14 +650,41 @@ getRoute targetId state = getRoute' targetId (routes state)
       | targetId' == rid = Right (Route rid name stopIds)
       | otherwise       = getRoute' targetId' rest
 
+updateRoute :: Route -> State -> Either String State
+updateRoute route state = 
+  let 
+    target = getRoute (case route of Route rid _ _ -> rid) state
+    in case target of
+      Left _ -> Left "Route not found"
+      Right e1 -> 
+        let
+          routes' = updateArray e1 route (routes state)
+          in case routes' of
+            Left e1' -> Left e1'
+            Right v1 -> Right state {routes = v1}
+
+deleteRoute :: RouteId -> State -> Either String State
+deleteRoute targetId state = 
+  let 
+    route = getRoute targetId state
+    in case route of
+      Left _ -> Left "Route not found"
+      Right e1 -> 
+        let
+          routes' = deleteFromArray e1 (routes state)
+          in case routes' of
+            Left e1' -> Left e1'
+            Right v1 -> Right state {routes = v1}
+
+
+
 addPath :: Path -> State -> Either String State
 addPath path state = 
   let 
-    pathId = case path of
-      Path pid _ _ _ _ -> pid
-    in case getPath pathId state of
-      Left _ -> Right state {paths = paths state ++ [path]}
-      Right _ -> Left "Path already exists"
+    paths' = addToArray path (paths state)
+    in case paths' of
+      Left e1 -> Left e1
+      Right v1 -> Right state {paths = v1}
 
 getPath :: PathId -> State -> Either String Path
 getPath targetId state = getPath' targetId (paths state)
@@ -635,6 +693,32 @@ getPath targetId state = getPath' targetId (paths state)
     getPath' targetId' (Path pid name pathLenght startId endId : rest) 
       | targetId' == pid = Right (Path pid name pathLenght startId endId)
       | otherwise       = getPath' targetId' rest
+
+updatePath :: Path -> State -> Either String State
+updatePath path state = 
+  let 
+    target = getPath (case path of Path pid _ _ _ _ -> pid) state
+    in case target of
+      Left _ -> Left "Path not found"
+      Right e1 -> 
+        let
+          paths' = updateArray e1 path (paths state)
+          in case paths' of
+            Left e1' -> Left e1'
+            Right v1 -> Right state {paths = v1}
+
+deletePath :: PathId -> State -> Either String State
+deletePath targetId state = 
+  let 
+    path = getPath targetId state
+    in case path of
+      Left _ -> Left "Path not found"
+      Right e1 -> 
+        let
+          paths' = deleteFromArray e1 (paths state)
+          in case paths' of
+            Left e1' -> Left e1'
+            Right v1 -> Right state {paths = v1}
 
 
 -- | Updates a state according to a query.
