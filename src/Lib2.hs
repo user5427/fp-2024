@@ -51,10 +51,44 @@ parseQuery _ = Left "Not implemented 2"
 
 
 
+getByExtractorFromArray :: Eq a => a -> (b -> a) -> [b] -> Either String b
+getByExtractorFromArray value extractor arr = getByIndexFromArray' value extractor arr
+  where
+    getByIndexFromArray' _ _ [] = Left "Element not found"
+    getByIndexFromArray' value' extractor' (h:t) = 
+      if value' == extractor' h 
+      then Right h 
+      else getByIndexFromArray' value' extractor' t
 
+getByIndexFromArray :: Eq a => Int -> [a] -> Either String a
+getByIndexFromArray index arr = getByIndexFromArray' index arr 0
+  where
+    getByIndexFromArray' _ [] _ = Left "Element not found"
+    getByIndexFromArray' index' (h:t) i = if index' == i then Right h else getByIndexFromArray' index' t (i + 1)
 
+getIndexFromArray :: Eq a => a -> [a] -> Either String Int
+getIndexFromArray target arr = getIndexFromArray' target arr 0
+  where
+    getIndexFromArray' _ [] _ = Left "Element not found"
+    getIndexFromArray' target' (h:t) index = if target' == h then Right index else getIndexFromArray' target' t (index + 1)  
 
+addToArray :: Eq a => a -> [a] -> Either String [a]
+addToArray = addToArray' []
+  where
+    addToArray' acc target [] = Right (acc ++ [target])
+    addToArray' acc target (h:t) = if target == h then Left "Element already exists" else Right (acc ++ [h] ++ t)
 
+updateArray :: Eq a => a -> a -> [a] ->  Either String [a]
+updateArray = updateArray' []
+  where
+    updateArray' _ _ _ [] = Left "Element not found"
+    updateArray' acc target new (h:t) = if target == h then Right (acc ++ [new] ++ t) else updateArray' (acc ++ [h]) target new t
+
+deleteFromArray :: Eq a => a -> [a] -> Either String [a]
+deleteFromArray = deleteFromArray' []
+  where
+    deleteFromArray' _ _ [] = Left "Element not found"
+    deleteFromArray' acc target (h:t) = if target == h then Right (acc ++ t) else deleteFromArray' (acc ++ [h]) target t
 
 
 type Parser a = String -> Either String (a, String)
@@ -393,6 +427,11 @@ data NextStop = NextStop StopId RouteId deriving (Show, Eq)
 data PreviousStop = PreviousStop StopId RouteId deriving (Show, Eq)
 data Stop = Stop StopId Name Point [NextStop] [PreviousStop] deriving (Show, Eq)
 
+
+
+-- getByExtractorFromArray :: Eq a => a -> (b -> a) -> [b] -> Either String b
+
+
 -- <create_stop> ::= "create_stop(" <stop_id> ", " <name> ", " <point> ")"
 parseCreateStop :: Parser Stop
 parseCreateStop [] = Left "empty input, cannot parse a create stop"
@@ -406,7 +445,21 @@ parseCreateStop input =
     Left e1 -> Left e1
     Right (r1, v1) -> Right (r1, v1)
 
--- parseSetNextStop :: Stop 
+-- <set_next_stop> ::= "set_next_stop(" <route_id> ", " <stop_id> ", " <next_stop_id> ")"
+parseSetNextStop :: [Stop] -> Parser Stop
+parseSetNextStop [] = Left "empty input, cannot parse a set next stop"
+parseSetNextStop input =
+  let
+    res = and3' (\a b c -> a b c)
+          (and3' (\_ a _ -> a) (parseExact "set_next_stop(") parseRouteId parseSeperator)
+          parseStopId
+          (and3' (\_ c _ -> c) parseSeperator parseStopId (parseExact ")")) input
+    in case res of
+    Left e1 -> Left e1
+    Right (r1, v1) -> Right (r1, v1)
+
+    -- get the stop id and get the stop using the extractor function from array
+
 
 data Route = Route RouteId Name [StopId] deriving (Show, Eq)
 
@@ -460,10 +513,6 @@ parseStopOrPathOrCreateList input = many' input []
             Right (_, r1) -> many' r1 acc
             Left e1 -> Right (acc, input)
 
-
-
-
-
 data Trip = Trip TripId Name [StopOrPathOrCreate] deriving (Show, Eq)
 
 -- <create_trip> ::= "create_trip(" <trip_id> ", " <name> ", " <list_of_stops_paths_creat> ")"
@@ -514,35 +563,6 @@ data State = State {
 emptyState :: State
 emptyState = State [] [] [] []
 
-getByIndexFromArray :: Eq a => Int -> [a] -> Either String a
-getByIndexFromArray index arr = getByIndexFromArray' index arr 0
-  where
-    getByIndexFromArray' _ [] _ = Left "Element not found"
-    getByIndexFromArray' index' (h:t) i = if index' == i then Right h else getByIndexFromArray' index' t (i + 1)
-
-getIndexFromArray :: Eq a => a -> [a] -> Either String Int
-getIndexFromArray target arr = getIndexFromArray' target arr 0
-  where
-    getIndexFromArray' _ [] _ = Left "Element not found"
-    getIndexFromArray' target' (h:t) index = if target' == h then Right index else getIndexFromArray' target' t (index + 1)  
-
-addToArray :: Eq a => a -> [a] -> Either String [a]
-addToArray = addToArray' []
-  where
-    addToArray' acc target [] = Right (acc ++ [target])
-    addToArray' acc target (h:t) = if target == h then Left "Element already exists" else Right (acc ++ [h] ++ t)
-
-updateArray :: Eq a => a -> a -> [a] ->  Either String [a]
-updateArray = updateArray' []
-  where
-    updateArray' _ _ _ [] = Left "Element not found"
-    updateArray' acc target new (h:t) = if target == h then Right (acc ++ [new] ++ t) else updateArray' (acc ++ [h]) target new t
-
-deleteFromArray :: Eq a => a -> [a] -> Either String [a]
-deleteFromArray = deleteFromArray' []
-  where
-    deleteFromArray' _ _ [] = Left "Element not found"
-    deleteFromArray' acc target (h:t) = if target == h then Right (acc ++ t) else deleteFromArray' (acc ++ [h]) target t
 
 
 
