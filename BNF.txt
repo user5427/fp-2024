@@ -33,8 +33,8 @@
 <route> ::= <route_id> | <create_route> | <join_two_routes> | <join_two_routes_at_stop>
 <stop_or_path_or_creat> ::= <create_stop> | <stop_or_path> | <find_next_stop> -- findNextStop missing
 + <stop_or_path> ::= <stop_id> | <path_id>
-+ <next_stop_id> ::= <stop_id>
-+ <previous_stop_id> ::= <stop_id>
+~ <next_stop_id> ::= <stop_id>
+~ <previous_stop_id> ::= <stop_id>
 + <name> ::= <string>
 + <point> ::= <coord_x> ", " <coord_y>
 + <coord_x> ::= <float>
