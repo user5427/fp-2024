@@ -55,9 +55,9 @@ getByExtractorFromArray :: Eq a => a -> (b -> a) -> [b] -> Either String b
 getByExtractorFromArray value extractor arr = getByIndexFromArray' value extractor arr
   where
     getByIndexFromArray' _ _ [] = Left "Element not found"
-    getByIndexFromArray' value' extractor' (h:t) = 
-      if value' == extractor' h 
-      then Right h 
+    getByIndexFromArray' value' extractor' (h:t) =
+      if value' == extractor' h
+      then Right h
       else getByIndexFromArray' value' extractor' t
 
 getByIndexFromArray :: Eq a => Int -> [a] -> Either String a
@@ -70,7 +70,7 @@ getIndexFromArray :: Eq a => a -> [a] -> Either String Int
 getIndexFromArray target arr = getIndexFromArray' target arr 0
   where
     getIndexFromArray' _ [] _ = Left "Element not found"
-    getIndexFromArray' target' (h:t) index = if target' == h then Right index else getIndexFromArray' target' t (index + 1)  
+    getIndexFromArray' target' (h:t) index = if target' == h then Right index else getIndexFromArray' target' t (index + 1)
 
 addToArray :: Eq a => a -> [a] -> Either String [a]
 addToArray = addToArray' []
@@ -317,7 +317,7 @@ parseStopIdList input = many' input []
     many' input acc =
       case parseStopId input of
         Right (v1, r1) -> many' r1 (acc ++ [v1])
-        Left _ -> 
+        Left _ ->
           case parseSeperator input of
             Right (_, r1) -> many' r1 acc
             Left e1 -> Right (acc, input)
@@ -418,7 +418,7 @@ parseStopOrPathList input = many' input []
     many' input acc =
       case parseStopOrPath input of
         Right (v1, r1) -> many' r1 (acc ++ [v1])
-        Left _ -> 
+        Left _ ->
           case parseSeperator input of
             Right (_, r1) -> many' r1 acc
             Left e1 -> Right (acc, input)
@@ -427,10 +427,27 @@ data NextStop = NextStop StopId RouteId deriving (Show, Eq)
 data PreviousStop = PreviousStop StopId RouteId deriving (Show, Eq)
 data Stop = Stop StopId Name Point [NextStop] [PreviousStop] deriving (Show, Eq)
 
+-- <route_id> ", " <next_stop_id>
+parseNextStop :: Parser NextStop
+parseNextStop input =
+  let
+    res = and2' (\a b -> NextStop b a)
+          parseRouteId
+          (and2' (\_ b -> b) parseSeperator parseStopId) input
+    in case res of
+      Left e1 -> Left e1
+      Right (r1, v1) -> Right (r1, v1)
 
-
--- getByExtractorFromArray :: Eq a => a -> (b -> a) -> [b] -> Either String b
-
+-- <route_id> ", " <previous_stop_id>
+parsePreviousStop :: Parser PreviousStop
+parsePreviousStop input =
+  let
+    res = and2' (\a b -> PreviousStop b a)
+          parseRouteId
+          (and2' (\_ b -> b) parseSeperator parseStopId) input
+    in case res of
+      Left e1 -> Left e1
+      Right (r1, v1) -> Right (r1, v1)
 
 -- <create_stop> ::= "create_stop(" <stop_id> ", " <name> ", " <point> ")"
 parseCreateStop :: Parser Stop
@@ -445,20 +462,59 @@ parseCreateStop input =
     Left e1 -> Left e1
     Right (r1, v1) -> Right (r1, v1)
 
--- <set_next_stop> ::= "set_next_stop(" <route_id> ", " <stop_id> ", " <next_stop_id> ")"
+-- <set_next_stop> ::= "set_next_stop(" <stop_id> ", " <route_id> ", " <next_stop_id> ")"
 parseSetNextStop :: [Stop] -> Parser Stop
-parseSetNextStop [] = Left "empty input, cannot parse a set next stop"
-parseSetNextStop input =
+parseSetNextStop _ [] = Left "empty input, cannot parse a set next stop"
+parseSetNextStop stops' input =
   let
-    res = and3' (\a b c -> a b c)
-          (and3' (\_ a _ -> a) (parseExact "set_next_stop(") parseRouteId parseSeperator)
-          parseStopId
-          (and3' (\_ c _ -> c) parseSeperator parseStopId (parseExact ")")) input
+    res = (and3' (\_ b _ -> b) (parseExact "set_next_stop(") parseStopId parseSeperator) input
     in case res of
     Left e1 -> Left e1
-    Right (r1, v1) -> Right (r1, v1)
-
-    -- get the stop id and get the stop using the extractor function from array
+    Right (a', v1) ->
+      let
+        stop = getByExtractorFromArray a' (\(Stop sid _ _ _ _) -> sid) stops'
+        in case stop of
+          Left e1 -> Left e1
+          Right foundStop@(Stop sid name point nextStops prevStops) -> 
+            let
+              nextStop = parseNextStop v1
+              in case nextStop of
+                Left e2 -> Left e2
+                Right (v2, r2) -> 
+                  let 
+                    parseClosing = parseExact ")" r2
+                    in case parseClosing of
+                      Left e3 -> Left e3
+                      Right (_, r3) -> 
+                        let updatedStop = Stop sid name point (v2 : nextStops) prevStops
+                        in Right (updatedStop, r3)
+              
+-- <set_previous_stop> ::= "set_previous_stop(" <stop_id> ", " <route_id> ", " <previous_stop_id> ")"
+parseSetPreviousStop :: [Stop] -> Parser Stop
+parseSetPreviousStop _ [] = Left "empty input, cannot parse a set previous stop"
+parseSetPreviousStop stops' input =
+  let
+    res = (and3' (\_ b _ -> b) (parseExact "set_previous_stop(") parseStopId parseSeperator) input
+    in case res of
+    Left e1 -> Left e1
+    Right (a', v1) ->
+      let
+        stop = getByExtractorFromArray a' (\(Stop sid _ _ _ _) -> sid) stops'
+        in case stop of
+          Left e1 -> Left e1
+          Right foundStop@(Stop sid name point nextStops prevStops) -> 
+            let
+              previousStop = parsePreviousStop v1
+              in case previousStop of
+                Left e2 -> Left e2
+                Right (v2, r2) -> 
+                  let 
+                    parseClosing = parseExact ")" r2
+                    in case parseClosing of
+                      Left e3 -> Left e3
+                      Right (_, r3) -> 
+                        let updatedStop = Stop sid name point nextStops (v2 : prevStops)
+                        in Right (updatedStop, r3)
 
 
 data Route = Route RouteId Name [StopId] deriving (Show, Eq)
@@ -508,7 +564,7 @@ parseStopOrPathOrCreateList input = many' input []
     many' input acc =
       case parseStopOrPathOrCreate input of
         Right (v1, r1) -> many' r1 (acc ++ [v1])
-        Left _ -> 
+        Left _ ->
           case parseSeperator input of
             Right (_, r1) -> many' r1 acc
             Left e1 -> Right (acc, input)
@@ -567,8 +623,8 @@ emptyState = State [] [] [] []
 
 
 addTrip :: Trip -> State -> Either String State
-addTrip trip state = 
-  let 
+addTrip trip state =
+  let
     trips' = addToArray trip (trips state)
     in case trips' of
       Left e1 -> Left e1
@@ -578,17 +634,17 @@ getTrip :: TripId -> State -> Either String Trip
 getTrip targetId state = getTrip' targetId (trips state)
   where
     getTrip' _ [] = Left "Trip not found"
-    getTrip' targetId' (Trip tid name stopOrPath : rest) 
+    getTrip' targetId' (Trip tid name stopOrPath : rest)
       | targetId' == tid = Right (Trip tid name stopOrPath)
       | otherwise       = getTrip' targetId' rest
 
 updateTrip :: Trip -> State -> Either String State
-updateTrip trip state = 
-  let 
+updateTrip trip state =
+  let
     target = getTrip (case trip of Trip tid _ _ -> tid) state
     in case target of
       Left _ -> Left "Trip not found"
-      Right e1 -> 
+      Right e1 ->
         let
           trips' = updateArray e1 trip (trips state)
           in case trips' of
@@ -596,12 +652,12 @@ updateTrip trip state =
             Right v1 -> Right state {trips = v1}
 
 deleteTrip :: TripId -> State -> Either String State
-deleteTrip targetId state = 
-  let 
+deleteTrip targetId state =
+  let
     target = getTrip targetId state
     in case target of
       Left _ -> Left "Trip not found"
-      Right e1 -> 
+      Right e1 ->
         let
           trips' = deleteFromArray e1 (trips state)
           in case trips' of
@@ -612,8 +668,8 @@ deleteTrip targetId state =
 
 addStop :: Stop -> State -> Either String State
 -- addStop stop state = state {stops = stops state ++ [stop]}
-addStop stop state = 
-  let 
+addStop stop state =
+  let
     stops' = addToArray stop (stops state)
     in case stops' of
       Left e1 -> Left e1
@@ -623,17 +679,17 @@ getStop :: StopId -> State -> Either String Stop
 getStop targetId state = getStop' targetId (stops state)
   where
     getStop' _ [] = Left "Stop not found"
-    getStop' targetId' (Stop sid name point prevStops nextStops : rest) 
+    getStop' targetId' (Stop sid name point prevStops nextStops : rest)
       | targetId' == sid = Right (Stop sid name point prevStops nextStops)
       | otherwise       = getStop' targetId' rest
 
 updateStop :: Stop -> State -> Either String State
-updateStop stop state = 
-  let 
+updateStop stop state =
+  let
     target = getStop (case stop of Stop sid _ _ _ _ -> sid) state
     in case target of
       Left _ -> Left "Stop not found"
-      Right e1 -> 
+      Right e1 ->
         let
           stops' = updateArray e1 stop (stops state)
           in case stops' of
@@ -641,12 +697,12 @@ updateStop stop state =
             Right v1 -> Right state {stops = v1}
 
 deleteStop :: StopId -> State -> Either String State
-deleteStop targetId state = 
-  let 
+deleteStop targetId state =
+  let
     stop = getStop targetId state
     in case stop of
       Left _ -> Left "Stop not found"
-      Right e1 -> 
+      Right e1 ->
         let
           stops' = deleteFromArray e1 (stops state)
           in case stops' of
@@ -655,8 +711,8 @@ deleteStop targetId state =
 
 
 addRoute :: Route -> State -> Either String State
-addRoute route state = 
-  let 
+addRoute route state =
+  let
     routes' = addToArray route (routes state)
     in case routes' of
       Left e1 -> Left e1
@@ -666,17 +722,17 @@ getRoute :: RouteId -> State -> Either String Route
 getRoute targetId state = getRoute' targetId (routes state)
   where
     getRoute' _ [] = Left "Route not found"
-    getRoute' targetId' (Route rid name stopIds : rest) 
+    getRoute' targetId' (Route rid name stopIds : rest)
       | targetId' == rid = Right (Route rid name stopIds)
       | otherwise       = getRoute' targetId' rest
 
 updateRoute :: Route -> State -> Either String State
-updateRoute route state = 
-  let 
+updateRoute route state =
+  let
     target = getRoute (case route of Route rid _ _ -> rid) state
     in case target of
       Left _ -> Left "Route not found"
-      Right e1 -> 
+      Right e1 ->
         let
           routes' = updateArray e1 route (routes state)
           in case routes' of
@@ -684,12 +740,12 @@ updateRoute route state =
             Right v1 -> Right state {routes = v1}
 
 deleteRoute :: RouteId -> State -> Either String State
-deleteRoute targetId state = 
-  let 
+deleteRoute targetId state =
+  let
     route = getRoute targetId state
     in case route of
       Left _ -> Left "Route not found"
-      Right e1 -> 
+      Right e1 ->
         let
           routes' = deleteFromArray e1 (routes state)
           in case routes' of
@@ -699,8 +755,8 @@ deleteRoute targetId state =
 
 
 addPath :: Path -> State -> Either String State
-addPath path state = 
-  let 
+addPath path state =
+  let
     paths' = addToArray path (paths state)
     in case paths' of
       Left e1 -> Left e1
@@ -710,17 +766,17 @@ getPath :: PathId -> State -> Either String Path
 getPath targetId state = getPath' targetId (paths state)
   where
     getPath' _ [] = Left "Path not found"
-    getPath' targetId' (Path pid name pathLenght startId endId : rest) 
+    getPath' targetId' (Path pid name pathLenght startId endId : rest)
       | targetId' == pid = Right (Path pid name pathLenght startId endId)
       | otherwise       = getPath' targetId' rest
 
 updatePath :: Path -> State -> Either String State
-updatePath path state = 
-  let 
+updatePath path state =
+  let
     target = getPath (case path of Path pid _ _ _ _ -> pid) state
     in case target of
       Left _ -> Left "Path not found"
-      Right e1 -> 
+      Right e1 ->
         let
           paths' = updateArray e1 path (paths state)
           in case paths' of
@@ -728,12 +784,12 @@ updatePath path state =
             Right v1 -> Right state {paths = v1}
 
 deletePath :: PathId -> State -> Either String State
-deletePath targetId state = 
-  let 
+deletePath targetId state =
+  let
     path = getPath targetId state
     in case path of
       Left _ -> Left "Path not found"
-      Right e1 -> 
+      Right e1 ->
         let
           paths' = deleteFromArray e1 (paths state)
           in case paths' of
