@@ -503,6 +503,58 @@ parseAssignStopToRoute stops' input =
                   Nothing -> Right (Stop sid name point nextStops prevStops (b' : routes'), v1)
                   Just (_) -> Left "Stop already belongs to the route"
 
+-- check if both stops belong to the same route
+-- check if the stops are not the same
+-- check if the stops are not already connected
+-- check if the distance is not 0
+parseSetNextStopData :: Stop -> RouteId -> Stop -> Either String Stop
+parseSetNextStopData stop routeId nextStop =
+  let
+    currentStop@(Stop sid name point nextStops prevStops routes') = stop
+    in case L.find (\rid -> rid == routeId) routes' of
+      Nothing -> Left "Stop does not belong to the route"
+      Just (_) ->
+        let
+          nextStop@(Stop nextStopId _ _ _ _ routes'') = nextStop
+          in case L.find (\rid -> rid == routeId) routes'' of
+            Nothing -> Left "Next stop does not belong to the route"
+            Just (_) ->
+              let
+                sameNextStop = getByExtractorFromArray routeId (\(NextStop _ rid) -> rid) nextStops
+                in case sameNextStop of
+                  Right e5 -> Left "Next stop already exists for that route"
+                  Left _ -> let
+                    in if stop == nextStop then Left "Stop cannot be connected to itself" else
+                      let
+                        distance = distanceBetweenStopsData stop nextStop
+                        in if distance == 0 then Left "Distance between stops is 0" else
+                          Right (Stop sid name point ((NextStop nextStopId routeId) : nextStops) prevStops routes')
+
+-- same for previous stop
+parseSetPreviousStopData :: Stop -> RouteId -> Stop -> Either String Stop
+parseSetPreviousStopData stop routeId previousStop =
+  let
+    currentStop@(Stop sid name point nextStops prevStops routes') = stop
+    in case L.find (\rid -> rid == routeId) routes' of
+      Nothing -> Left "Stop does not belong to the route"
+      Just (_) ->
+        let
+          previousStop@(Stop previousStopId _ _ _ _ routes'') = previousStop
+          in case L.find (\rid -> rid == routeId) routes'' of
+            Nothing -> Left "Previous stop does not belong to the route"
+            Just (_) ->
+              let
+                samePreviousStop = getByExtractorFromArray routeId (\(PreviousStop _ rid) -> rid) prevStops
+                in case samePreviousStop of
+                  Right e5 -> Left "Previous stop already exists for that route"
+                  Left _ -> let
+                    in if stop == previousStop then Left "Stop cannot be connected to itself" else
+                      let
+                        distance = distanceBetweenStopsData stop previousStop
+                        in if distance == 0 then Left "Distance between stops is 0" else
+                          Right (Stop sid name point nextStops ((PreviousStop previousStopId routeId) : prevStops) routes')
+
+
 -- <set_next_stop> ::= "set_next_stop(" <stop_id> ", " <route_id> ", " <next_stop_id> ")"
 parseSetNextStop :: [Stop] -> Parser Stop
 parseSetNextStop _ [] = Left "empty input, cannot parse a set next stop"
@@ -527,15 +579,11 @@ parseSetNextStop stops' input =
                     in case parseClosing of
                       Left e3 -> Left e3
                       Right (_, r3) -> 
-                           let routeId = case v2 of (NextStop _ rid) -> rid
-                           in case L.find (\rid -> rid == routeId) routes' of
-                            Nothing -> Left "Stop does not belong to the route"
-                            Just (_) ->
-                              let
-                                sameNextStop = getByExtractorFromArray (case v2 of (NextStop _ rid) -> rid) (\(NextStop _ rid) -> rid) nextStops
-                                in case sameNextStop of
-                                  Right e5 -> Left "Next stop already exists for that route"
-                                  Left _ -> Right (Stop sid name point (v2 : nextStops) prevStops routes', r3) 
+                           let 
+                            parseee = parseSetNextStopData foundStop (case v2 of (NextStop _ rid) -> rid) (case v2 of (NextStop sid _) -> sid)
+                            in case parseee of
+                              Left e4 -> Left e4
+                              Right stop' -> Right stop'
 
 
 -- <set_previous_stop> ::= "set_previous_stop(" <stop_id> ", " <route_id> ", " <previous_stop_id> ")"
@@ -563,15 +611,10 @@ parseSetPreviousStop stops' input =
                       Left e3 -> Left e3
                       Right (_, r3) -> 
                         let 
-                          routeId = case v2 of (PreviousStop _ rid) -> rid
-                          in case L.find (\rid -> rid == routeId) routes' of
-                          Nothing -> Left "Stop does not belong to the route"
-                          Just (_) ->
-                            let
-                              samePreviousStop = getByExtractorFromArray (case v2 of (PreviousStop _ rid) -> rid) (\(PreviousStop _ rid) -> rid) prevStops
-                              in case samePreviousStop of
-                                Right e5 -> Left "Previous stop already exists for that route"
-                                Left _ -> Right (Stop sid name point nextStops (v2 : prevStops) routes', r3)
+                          parseee = parseSetPreviousStopData foundStop (case v2 of (PreviousStop _ rid) -> rid) (case v2 of (PreviousStop sid _) -> sid)
+                          in case parseee of
+                            Left e4 -> Left e4
+                            Right stop' -> Right stop'
 
 -- data NextStop = NextStop StopId RouteId deriving (Show, Eq)
 -- <find_next_stop> ::= "find_next_stop(" <stop_id> ", " <route> ")"
@@ -659,21 +702,20 @@ findClosestStop _ [] = Left "Closest stop not found"
 findClosestStop stop [] = Left "Closest stop not found"
 findClosestStop stop input =
   let
-    closStop = findClosestStop' stop input -1 stop
+    closStop = findClosestStop' stop input (-1) stop
     in case closStop of
       Left e1 -> Left e1
       Right (v1) -> Right v1
+
     where
-      findClosestStop' _ [] _ _ = Left "Closest stop not found"
       findClosestStop' a [] _ b = if a == b then Left "Closest stop not found" else Right (b)
       findClosestStop' a (h:t) distance closestStop =
         let
           newDistance = distanceBetweenStopsData a h
-          in if newDistance < distance || distance == -1
+          in if newDistance < distance || distance == (-1)
             then findClosestStop' a t newDistance h
             else findClosestStop' a t distance closestStop
 
--- <distance_between_stops> ::= "distance_between_stops(" <stop_id> ", " <stop_id> ")"
 
 distanceBetweenStopsData :: Stop -> Stop-> Float
 distanceBetweenStopsData a b =
@@ -682,7 +724,7 @@ distanceBetweenStopsData a b =
     bPoint = (case b of (Stop _ _ b' _ _ _ ) -> b')
     in (distanceBetweenPoints aPoint bPoint)
         
-
+-- <distance_between_stops> ::= "distance_between_stops(" <stop_id> ", " <stop_id> ")"
 distanceBetweenStops :: [Stop] -> Parser Float
 distanceBetweenStops _ [] = Left "empty input, cannot parse a distance between stops"
 distanceBetweenStops stops' input =
@@ -738,34 +780,47 @@ connectRouteStopsByMinDist stops' input =
           Left e1 -> Left e1
           Right routeStops' -> 
             let
-              connectedStops = connectStopsByMinDist routeStops'
+              connectedStops = connectStopsByMinDist routeStops' a'
               in Right (connectedStops, v1)
 
   where
-    connectStopsByMinDist [] = []
-    connectStopsByMinDist [stop] = [stop]
-    connectStopsByMinDist (stop:rest) =
+    connectStopsByMinDist [] _ = []
+    connectStopsByMinDist [stop] _ = [stop]
+    connectStopsByMinDist (stop:rest) route' =
       let
-        connectedStop = findClosestStop stop rest
-        in case connectedStop of
-          Left _ -> connectStopsByMinDist rest
-          Right (connectedStop', rest') -> stop : connectStopsByMinDist (connectedStop' : rest')
+        connectedStops = connectStopsByMinDist' stop stop rest []
+        in case connectedStops of
+          Left e1 -> []
+          Right connectedStops' -> connectedStops'
 
-    findClosestStop _ [] = Left "Closest stop not found"
-    findClosestStop stop [] = Left "Closest stop not found"
-    findClosestStop stop (h:t) =
-      let
-        distance = distanceBetweenPoints (getStopPoint stop) (getStopPoint h)
-        in findClosestStop' stop h t distance
 
-    findClosestStop' _ _ [] _ = Left "Closest stop not found"
-    findClosestStop' stop closestStop [] _ = Right (closestStop, [])
-    findClosestStop' stop closestStop (h:t) distance =
-      let
-        newDistance = distanceBetweenPoints (getStopPoint stop) (getStopPoint h)
-        in if newDistance < distance
-          then findClosestStop' stop h t newDistance
-          else findClosestStop'
+      where
+        connectStopsByMinDist' prev' stop' [] acc =
+          let
+            newPrevStop = parseSetPreviousStopData stop' route' prev'
+            in case newPrevStop of
+              Left e1 -> Left e1
+              Right newPrevStop' -> acc ++ [newPrevStop']
+        connectStopsByMinDist' prev' stop' (h:t) acc =
+          let
+            closestStop = findClosestStop stop' (h:t)
+            in case closestStop of
+              Left e1 -> Left e1
+              Right closestStop' -> let
+                newStop = parseSetNextStopData stop' route' closestStop'
+                in case newStop of 
+                  Left e2 -> Left e2
+                  Right newStop' -> 
+                    let 
+                      in if stop' == h then connectStopsByMinDist' newStop' newStop' t (acc ++ [newStop'])
+                      else 
+                        let
+                          newPrevStop = parseSetPreviousStopData newStop' route' prev'
+                          in case newPrevStop of
+                            Left e3 -> Left e3
+                            Right newPrevStop' -> connectStopsByMinDist' newPrevStop' closestStop' t (acc ++ [newStop'])
+
+   
 
 
 -- <stop_or_path_or_creat> ::= <create_stop> | <stop_or_path> | <find_next_stop> | <find_previous_stop>
