@@ -26,8 +26,8 @@ data Query
   | CreatePath PathId Name PathLenght StopId StopId -- +
   | CreateTrip TripId Name [QueryStopOrPathOrCreate] -- +~ QueryStopOrPathOrCreate
   | JoinTwoTrips QueryTrip QueryTrip TripId Name -- +
-  | JoinTwoRouter QueryRoute QueryRoute RouteId Name -- + QueryRoute
-  | JoinTwoRouterAtStop QueryRoute QueryRoute QueryStopOrCreatOrNextPrev RouteId Name --
+  | JoinTwoRoutes QueryRoute QueryRoute RouteId Name -- + QueryRoute
+  | JoinTwoRoutesAtStop QueryRoute QueryRoute QueryStopOrCreatOrNextPrev RouteId Name --
   | CleanupTrip QueryTrip -- + QueryTrip
   | ValidateTrip QueryTrip -- +
   | FindNextStop StopId RouteId -- +
@@ -359,7 +359,7 @@ parseQueryTrip input =
           Right (r1, v1) -> Right (CreateTrip' r1, v1)
           Left e2 -> Left e2
 -- <route> ::= <route_id> | <create_route> | <join_two_routes> | <join_two_routes_at_stop> -- Route
-data QueryRoute = Route' RouteId | CreateRoute' Query | JoinTwoRouter' Query | JoinTwoRouterAtStop' Query deriving (Show, Eq)
+data QueryRoute = Route' RouteId | CreateRoute' Query | JoinTwoRoutes' Query | JoinTwoRoutesAtStop' Query deriving (Show, Eq)
 parseQueryRoute :: Parser QueryRoute
 parseQueryRoute input =
   let
@@ -373,11 +373,11 @@ parseQueryRoute input =
           Left e2 -> 
             let res'' = parseQueryJoinTwoRouter input
             in case res'' of
-              Right (r1, v1) -> Right (JoinTwoRouter' r1, v1)
+              Right (r1, v1) -> Right (JoinTwoRoutes' r1, v1)
               Left e3 -> 
                 let res''' = parseQueryJoinTwoRouterAtStop input
                 in case res''' of
-                  Right (r1, v1) -> Right (JoinTwoRouterAtStop' r1, v1)
+                  Right (r1, v1) -> Right (JoinTwoRoutesAtStop' r1, v1)
                   Left e4 -> Left e4
 --
 --  | Functions
@@ -566,7 +566,7 @@ parseQueryCleanupTrip input =
 parseQueryJoinTwoRouter :: Parser Query
 parseQueryJoinTwoRouter input =
   let
-    res = and5' (\_ a b c d -> JoinTwoRouter a b c d)
+    res = and5' (\_ a b c d -> JoinTwoRoutes a b c d)
           (parseExact "join_two_routes(")
           parseQueryRoute
           (and3' (\_ b _ -> b) parseSeperator parseQueryRoute parseSeperator)
@@ -579,7 +579,7 @@ parseQueryJoinTwoRouter input =
 parseQueryJoinTwoRouterAtStop :: Parser Query
 parseQueryJoinTwoRouterAtStop input =
   let
-    res = and5' (\a b c d e -> JoinTwoRouterAtStop a b c d e)
+    res = and5' (\a b c d e -> JoinTwoRoutesAtStop a b c d e)
           (and3' (\_ a _ -> a) (parseExact "join_two_routes_at_stop(") parseQueryRoute parseSeperator)
           (and2' (\_ b -> b) parseSeperator parseQueryRoute)
           (and3' (\_ c _ -> c) parseSeperator parseQueryStopOrCreatOrNextPrev parseSeperator)
@@ -1332,61 +1332,75 @@ joinTwoRoutesData routes' stops' v1 v2 v3 v4 =
                               Left e9 -> Left e9
                               Right foundStops -> Right (newRoute, foundStops)
 -- <join_two_trips> ::= "join_two_trips(" <trip> ", " <trip> ", " <new_trip_id> ", " <new_name> ")"
-joinTwoTrips :: State -> Query -> Either String State
+joinTwoTrips :: State -> Query -> Either String (Trip, State)
 joinTwoTrips state query' =
   case query' of
     (JoinTwoTrips trip1 trip2 newTripId newName) ->
       let
-        fisrtTrip = getByExtractorFromArray trip1 (\(Trip tid _ _) -> tid) (trips state)
-        in case fisrtTrip of
+        tripFromQuery1 = parseQueryTripData trip1 state
+        in case tripFromQuery1 of
           Left e1 -> Left e1
-          Right foundTrip1@(Trip _ _ stopOrPathList1) ->
+          Right (t1@(Trip tid1 _ stopOrPathList1), state') ->
             let
-              secondTrip = getByExtractorFromArray trip2 (\(Trip tid _ _) -> tid) (trips state)
-              in case secondTrip of
-                Left e2 -> Left e2
-                Right foundTrip2@(Trip _ _ stopOrPathList2) ->
+              tripFromQuery2 = parseQueryTripData trip2 state'
+              in case tripFromQuery2 of
+                Left e1 -> Left e1
+                Right (t2@(Trip tid2 _ stopOrPathList2), state'') ->
                   let
                     newTrip = Trip newTripId newName (stopOrPathList1 ++ stopOrPathList2)
-                    addTrip' = addTrip newTrip state
+                    addTrip' = addTrip newTrip state''
                     in case addTrip' of
                       Left e4 -> Left e4
-                      Right newState -> Right newState
+                      Right newState -> Right (newTrip, newState)
     _ -> Left "Not a join two trips query"
 
 -- <join_two_routes_at_stop> ::= "join_two_routes_at_stop(" <route> ", " <route> ", " <stop_or_creat_or_nextprev> ", " <new_route_id> ", " <new_name> ")" -- min distance order
-joinTwoRoutesAtStop :: State -> Query -> Either String State
+joinTwoRoutesAtStop :: State -> Query -> Either String (Route, State)
 joinTwoRoutesAtStop state query' =
   case query' of
-    (JoinTwoRoutesAtStop route1 route2 stopOrCreateNew newRouteId newName) ->
+    (JoinTwoRoutesAtStop route1' route2' stopOrCreateNew newRouteId newName) ->
       let
-        newRoute = fst (joinTwoRoutesAtStopData (routes state) (stops state) route1 route2 newRouteId newName)
-        in case newRoute of
+        routeFromQuery1 = parseQueryRouteData route1' state
+        in case routeFromQuery1 of
           Left e1 -> Left e1
-          Right (route, newstate) ->
+          Right (r@(Route rid _ _), state') ->
             let
-              case stopOrCreateNew of
-                (QueryStopOrCreatOrNextPrevStop stop) ->
+              routeFromQuery2 = parseQueryRouteData route2' state'
+              in case routeFromQuery2 of
+                Left e1 -> Left e1
+                Right (r2@(Route rid2 _ _), state'') ->
                   let
-                    assignStop = assignStopsToRoute [stop] newRouteId
-                    in case assignStop of
-                      Left e2 -> Left e2
-                      Right foundStops -> 
+                    newRoute = (joinTwoRoutesData (routes state'') (stops state'') rid rid2 newRouteId newName)
+                    in case newRoute of
+                      Left e1 -> Left e1
+                      Right (route, stops') ->
                         let
-                          addStopToRoute = addStopIdToRoute stop route -- get the stop from the state  
-                          in case addStopToRoute of
-                            Left e3 -> Left e3
-                            Right updatedRoute -> Right 
+                          parseStopOrCreateNew = parseQueryStopOrCreatOrNextPrevData stopOrCreateNew state''
+                          in case parseStopOrCreateNew of
+                            Left e99 -> Left e99
+                            Right (get@(Stop sid name point nexts prevs rout), state'''') ->
                               let
-                                addRoute' = addRoute updatedRoute newstate
-                                in case addRoute' of
-                                  Left e4 -> Left e4
-                                  Right almostFinalState -> 
+                                assignStop = assignStopsToRoute [get] newRouteId
+                                in case assignStop of
+                                  Left e2 -> Left e2
+                                  Right (foundStops:t) -> 
                                     let
-                                      updateStop = updateOrAddStop foundStops almostFinalState
-                                      in case updateStop of
-                                        Left e5 -> Left e5
-                                        Right finalState -> Right finalState
+                                      addStopToRoute = addStopIdToRoute sid route -- get the stop from the state  
+                                      in case addStopToRoute of
+                                        Left e3 -> Left e3
+                                        Right updatedRoute ->  
+                                          let
+                                            addRoute' = addRoute updatedRoute state''''
+                                            in case addRoute' of
+                                              Left e4 -> Left e4
+                                              Right almostFinalState -> 
+                                                let
+                                                  updateStop' = updateStop foundStops almostFinalState
+                                                  in case updateStop' of
+                                                    Left e5 -> Left e5
+                                                    Right finalState -> Right (updatedRoute, finalState)
+                                      
+                                        
     _ -> Left "Not a join two routes at stop query"
 
 
@@ -1394,8 +1408,8 @@ joinTwoRoutesAtStop state query' =
 
 
 -- QUERY HELPERS
-parseQueryRoute :: QueryRoute -> State -> Parser (Route, State) -- create new route if needed and return the route id
-parseQueryRoute query' state =
+parseQueryRouteData :: QueryRoute -> State -> Either String (Route, State) -- create new route if needed and return the route id
+parseQueryRouteData query' state =
   case query' of
     (Route' routeId) ->
       let
@@ -1405,60 +1419,80 @@ parseQueryRoute query' state =
           Right foundRoute -> Right (foundRoute, state)
     (CreateRoute' query'') ->
       let
-        createRoute = createRoute state query''
-        in case createRoute of
+        createRoute' = createRoute state query''
+        in case createRoute' of
           Left e1 -> Left e1
           Right (route, newState) -> Right (route, newState)
-    (JoinTwoRouter' query'') ->
+    (JoinTwoRoutes' query'') ->
       let
-        joinTwoRoutes = joinTwoRoutes state query''
-        in case joinTwoRoutes of
+        joinTwoRoutes' = joinTwoRoutes state query''
+        in case joinTwoRoutes' of
           Left e1 -> Left e1
           Right (route, newState) -> Right (route, newState)
-    (JoinTwoRouterAtStop' query'') ->
+    (JoinTwoRoutesAtStop' query'') ->
       let
-        joinTwoRoutesAtStop = joinTwoRoutesAtStop state query''
-        in case joinTwoRoutesAtStop of
+        joinTwoRoutesAtStop' = joinTwoRoutesAtStop state query''
+        in case joinTwoRoutesAtStop' of
           Left e1 -> Left e1
           Right newState -> Right newState
 -- QUERY HELPERS
-parseQueryStopOrPathOrCreate :: QueryStopOrPathOrCreate -> State -> Parser StopOrPath
-parseQueryStopOrPathOrCreate query' state =
+parseQueryStopOrPathOrCreateData :: QueryStopOrPathOrCreate -> State -> Either String (StopOrPath, State)
+parseQueryStopOrPathOrCreateData query' state =
   case query' of
     (QueryStopOrPath' query'') ->
       let
-        in -> Right (query'', state)
+        queryStopOrPath' = parseQueryStopOrPathData query'' state
+        in case queryStopOrPath' of
+          Left e1 -> Left e1
+          Right (stopOrPath, newState) -> Right (stopOrPath, newState)
     (CreateStop' query'') ->
       let
-        createStop = createStop state query''
-        in case createStop of
+        createStop' = createStop state query''
+        in case createStop' of
           Left e1 -> Left e1
-          Right (stop, newState) -> Right (stop, newState)
+          Right (stop, newState) -> Right (Stop' stop, newState)
     (FindNextStop' query'') ->
       let
-        findNextStop = findNextStop state query''
-        in case findNextStop of
+        findNextStop' = findNextStop state query''
+        in case findNextStop' of
           Left e1 -> Left e1
           Right (stopId, newState) ->
             let
               stop = getByExtractorFromArray stopId (\(Stop sid _ _ _ _ _) -> sid) (stops newState)
               in case stop of
                 Left e2 -> Left e2
-                Right foundStop -> Right (foundStop, newState)
+                Right foundStop -> Right (Stop' foundStop, newState)
     (FindPreviousStop' query'') ->
       let
-        findPreviousStop = findPreviousStop state query''
-        in case findPreviousStop of
+        findPreviousStop' = findPreviousStop state query''
+        in case findPreviousStop' of
           Left e1 -> Left e1
           Right (stopId, newState) ->
             let
               stop = getByExtractorFromArray stopId (\(Stop sid _ _ _ _ _) -> sid) (stops newState)
               in case stop of
                 Left e2 -> Left e2
-                Right foundStop -> Right (foundStop, newState)
+                Right foundStop -> Right (Stop' foundStop, newState)
 -- QUERY HELPERS
-parseQueryStopOrCreatOrNextPrev :: QueryStopOrCreatOrNextPrev -> State -> Parser (Stop, State)
-parseQueryStopOrCreatOrNextPrev query' state =
+parseQueryStopOrPathData :: QueryStopOrPath -> State -> Either String (StopOrPath, State)
+parseQueryStopOrPathData query' state =
+  case query' of
+    (StopId' stopId) ->
+      let
+        stop = getByExtractorFromArray stopId (\(Stop sid _ _ _ _ _) -> sid) (stops state)
+        in case stop of
+          Left e1 -> Left e1
+          Right foundStop -> Right (Stop' foundStop, state)
+    (PathId' pathId) ->
+      let
+        path = getByExtractorFromArray pathId (\(Path pid _ _ _ _) -> pid) (paths state)
+        in case path of
+          Left e1 -> Left e1
+          Right foundPath -> Right (Path' foundPath, state)
+    _ -> Left "Not a stop or path query"
+-- QUERY HELPERS
+parseQueryStopOrCreatOrNextPrevData :: QueryStopOrCreatOrNextPrev -> State -> Either String (Stop, State)
+parseQueryStopOrCreatOrNextPrevData query' state =
   case query' of
     (QueryStopOrCreatOrNextPrevStop stopId) ->
       let
@@ -1468,14 +1502,14 @@ parseQueryStopOrCreatOrNextPrev query' state =
           Right foundStop -> Right (foundStop, state)
     (QueryStopOrCreatOrNextPrevCreateStop query'') ->
       let
-        createStop = createStop state query''
-        in case createStop of
+        createStop' = createStop state query''
+        in case createStop' of
           Left e1 -> Left e1
           Right (stop, newState) -> Right (stop, newState)
     (QueryStopOrCreatOrNextPrevFindNextStop query'') ->
       let
-        findNextStop = findNextStop state query''
-        in case findNextStop of
+        findNextStop' = findNextStop state query''
+        in case findNextStop' of
           Left e1 -> Left e1
           Right (stopId, newState) ->
             let
@@ -1485,8 +1519,8 @@ parseQueryStopOrCreatOrNextPrev query' state =
                 Right foundStop -> Right (foundStop, newState)
     (QueryStopOrCreatOrNextPrevFindPreviousStop query'') ->
       let
-        findPreviousStop = findPreviousStop state query''
-        in case findPreviousStop of
+        findPreviousStop' = findPreviousStop state query''
+        in case findPreviousStop' of
           Left e1 -> Left e1
           Right (stopId, newState) ->
             let
@@ -1495,8 +1529,8 @@ parseQueryStopOrCreatOrNextPrev query' state =
                 Left e2 -> Left e2
                 Right foundStop -> Right (foundStop, newState)
 -- QUERY HELPERS
-parseQueryTrip :: QueryTrip -> State -> Parser (Trip, State)
-parseQueryTrip query' state =
+parseQueryTripData :: QueryTrip -> State -> Either String  (Trip, State)
+parseQueryTripData query' state =
   case query' of
     (Trip' tripId) ->
       let
@@ -1506,8 +1540,8 @@ parseQueryTrip query' state =
           Right foundTrip -> Right (foundTrip, state)
     (CreateTrip' query'') ->
       let
-        createTrip = createTrip state query''
-        in case createTrip of
+        createTrip' = createTrip state query''
+        in case createTrip' of
           Left e1 -> Left e1
           Right (trip, newState) -> Right (trip, newState)
 
