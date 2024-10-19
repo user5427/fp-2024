@@ -875,10 +875,6 @@ getRouteStops routeId stops' = getRouteStops' routeId stops' []
           Nothing -> getRouteStops' routeId' t acc
           Just _ -> getRouteStops' routeId' t (acc ++ [h])
 
-        -- in if routeId' == (case )
-        --   then getRouteStops' routeId' t (acc ++ [h])
-        --   else getRouteStops' routeId' t acc
-
 
 connectStopsByMinDistData :: [Stop] -> RouteId -> Either String [Stop]
 connectStopsByMinDistData [] _ = Right []
@@ -1275,11 +1271,12 @@ parseJoinTwoTrip trips' stops' paths' input =
     in case res of
       Left e1 -> Left e1
       Right ((a', b', c', d'), r1) ->
-        let
-          tripAStopOrPath = case a' of (Trip _ _ a'') -> a''
-          tripBStopOrPath = case b' of (Trip _ _ b'') -> b''
-          newTrip = Trip c' d' (tripAStopOrPath ++ tripBStopOrPath)
-          in Right (newTrip, r1)
+        case (a', b') of
+          (Trip _ _ a'', Trip _ _ b'') ->
+            let
+              newTrip = Trip c' d' (a'' ++ b'')
+              in Right (newTrip, r1)
+          _ -> Left "Trips not found"
 
 -- <validate_trip> ::= "validate_trip(" <trip> ")" -- all stops and paths are connected
 parseValidateTrip :: [Trip] -> [Stop] -> [Path] -> Parser Bool
@@ -1300,7 +1297,6 @@ parseValidateTrip trips' stops' paths' input =
               let
                 in if connected' then Right (True, v1)
                 else Right (False, v1)
-
 
 validateTripData :: [StopOrPath] -> Either String Bool
 validateTripData [] = Right True
@@ -1352,64 +1348,145 @@ validateTripData input = validateTripData' input
 
 stopConnectedWithPath :: StopOrPath -> StopOrPath -> Bool
 stopConnectedWithPath sop1 sop2 =
-  let
-    stopId = case sop1 of (Stop' (Stop sid _ _ _ _ _)) -> sid
-    path@(Path _ _ _ stopId1 stopId2) = case sop2 of (Path' p) -> p   -- Stop -> Path
-    in if stopId == stopId1 || stopId == stopId2
-      then True
-      else let
-        path@(Path _ _ _ stopId1' stopId2') = case sop1 of (Path' p) -> p -- Path -> Stop
-        stopId' = case sop2 of (Stop' (Stop sid _ _ _ _ _)) -> sid
-        in if stopId' == stopId1' || stopId' == stopId2'
-          then True
-          else False
+  case (sop1, sop2) of
+    (Stop' (Stop sid _ _ _ _ _), Path' (Path _ _ _ stopId1 stopId2)) ->
+      sid == stopId1 || sid == stopId2
+    (Path' (Path _ _ _ stopId1' stopId2'), Stop' (Stop sid _ _ _ _ _)) ->
+      sid == stopId1' || sid == stopId2'
+    _ -> False
 
 pathWithPathConnected :: StopOrPath -> StopOrPath -> Bool
 pathWithPathConnected sop1 sop2 =
-  let
-    path@(Path _ _ _ stopId1 stopId2) = case sop1 of (Path' p) -> p
-    path2@(Path _ _ _ stopId1' stopId2') = case sop2 of (Path' p) -> p
-    in stopId1 == stopId1' || stopId1 == stopId2' || stopId2 == stopId1' || stopId2 == stopId2'
+  case (sop1, sop2) of
+    (Path' p1, Path' p2) -> pathWithPathConnected' p1 p2
+    _ -> False
+
+    where 
+      pathWithPathConnected' p1 p2 =
+        let
+          path@(Path _ _ _ stopId1 stopId2) = p1
+          path2@(Path _ _ _ stopId1' stopId2') = p2
+          in stopId1 == stopId1' || stopId1 == stopId2' || stopId2 == stopId1' || stopId2 == stopId2'
 
 -- check if the stopsAndPaths are connected with each other
 connectedForwards :: StopOrPath -> StopOrPath -> Bool
 connectedForwards sop1 sop2 =
   let
     stopConWithPath = stopConnectedWithPath sop1 sop2
-      in (stopConWithPath || (let
-                           st1@(Stop _ _ _ nextStops _ _) = case sop1 of (Stop' s) -> s
-                           st2@(Stop sid2 _ _ _ _ _) = case sop2 of (Stop' s) -> s
-                           findNext = getByExtractorFromArray sid2 (\(NextStop sid _) -> sid) nextStops
-                           in case findNext of
-                             Right _ -> True
-                             Left _ ->
-                               let
-                                 -- both path
-                                 pathConWithPath = pathWithPathConnected sop1 sop2
-                                 in if pathConWithPath
-                                   then True
-                                   else False))
+  in stopConWithPath || 
+     case (sop1, sop2) of
+       (Stop' (Stop _ _ _ nextStops _ _), Stop' (Stop sid2 _ _ _ _ _)) ->
+         let
+           findNext = getByExtractorFromArray sid2 (\(NextStop sid _) -> sid) nextStops
+         in case findNext of
+              Right _ -> True
+              Left _  -> pathWithPathConnected sop1 sop2
+       _ -> pathWithPathConnected sop1 sop2
 
 connectBackwards :: StopOrPath -> StopOrPath -> Bool
 connectBackwards sop1 sop2 =
   let
     stopConWithPath = stopConnectedWithPath sop1 sop2
-      in (stopConWithPath || (let
-                           st1@(Stop _ _ _ _ prevStops _) = case sop1 of (Stop' s) -> s
-                           st2@(Stop sid2 _ _ _ _ _) = case sop2 of (Stop' s) -> s
-                           findPrev = getByExtractorFromArray sid2 (\(PreviousStop sid _) -> sid) prevStops
-                           in case findPrev of
-                             Right _ -> True
-                             Left _ ->
-                               let
-                                 -- both path
-                                 pathConWithPath = pathWithPathConnected sop1 sop2
-                                 in if pathConWithPath
-                                   then True
-                                   else False))
+  in stopConWithPath || 
+     case (sop1, sop2) of
+       (Stop' (Stop _ _ _ _ prevStops _), Stop' (Stop sid2 _ _ _ _ _)) ->
+         let
+           findPrev = getByExtractorFromArray sid2 (\(PreviousStop sid _) -> sid) prevStops
+         in case findPrev of
+              Right _ -> True
+              Left _  -> pathWithPathConnected sop1 sop2
+       _ -> pathWithPathConnected sop1 sop2
 
 
+-- <cleanup_trip> ::= "cleanup_trip(" <trip> ")"
+parseCleanupTrip :: [Trip] -> [Stop] -> [Path] -> Parser Trip
+parseCleanupTrip _ _ _ [] = Left "empty input, cannot parse a cleanup trip"
+parseCleanupTrip trips' stops' paths' input =
+  let
+    res = and2' (\a _ -> a)
+          (and3' (\_ b _ -> b) (parseExact "cleanup_trip(") (parseTripIdOrCreate trips' stops' paths') parseSeperator)
+          (parseExact ")") input
+    in case res of
+      Left e1 -> Left e1
+      Right (foundTrip@(Trip _ _ stopOrPath), v1) ->
+        let
+          validate = validateTripData stopOrPath
+          in case validate of
+            Right _ -> Left "Trip is already connected"
+            Left e1 -> 
+              let
+                cleaned = cleanupTripData stopOrPath
+                in case cleaned of
+                  Left e2 -> Left e2
+                  Right cleaned' -> Right (Trip (case foundTrip of Trip tid _ _ -> tid) (case foundTrip of Trip _ name _ -> name) cleaned', v1)
 
+-- basically add one element and check if it is valid, if yes continue adding if no, then just return the valid part
+cleanupTripData :: [StopOrPath] -> Either String [StopOrPath]
+cleanupTripData [] = Right []
+cleanupTripData [stopOrPath] = Right [stopOrPath]
+cleanupTripData input = cleanUpTripData input []
+  where
+    cleanUpTripData [] acc = Right acc
+    cleanUpTripData [stopOrPath] acc = Right (acc ++ [stopOrPath])
+    cleanUpTripData s@(h:t) acc =
+      let
+        connected = validateTripData s
+        in case connected of
+          Left e1 -> Right acc
+          Right _ -> cleanUpTripData t (acc ++ [h])
+        
+-- <trip_distance> ::= "trip_distance(" <trip> ")" -- sum of path lengths and distances between stop poitntssnsns
+parseTripDistance :: [Trip] -> [Stop] -> [Path] -> Parser Float
+parseTripDistance _ _ _ [] = Left "empty input, cannot parse a trip distance"
+parseTripDistance trips' stops' paths' input =
+  let
+    res = and2' (\a _ -> a)
+          (and3' (\_ b _ -> b) (parseExact "trip_distance(") (parseTripIdOrCreate trips' stops' paths') parseSeperator)
+          (parseExact ")") input
+    in case res of
+      Left e1 -> Left e1
+      Right (foundTrip@(Trip _ _ stopOrPath), v1) ->
+        let
+          distance = tripDistanceData stopOrPath
+          in case distance of
+            Left e1 -> Left e1
+            Right distance' -> Right (distance', v1)
+
+stopOrPathDistance :: StopOrPath -> StopOrPath -> Either String Float
+stopOrPathDistance sop1 sop2 =
+  case (sop1, sop2) of
+    (Stop' (Stop _ _ point1 _ _ _), Stop' (Stop _ _ point2 _ _ _)) ->
+      let distance = distanceBetweenPoints point1 point2
+      in Right distance
+    (Stop' (Stop _ _ point1 _ _ _), Path' (Path _ _ length' _ _)) ->
+      let distance = case length' of PathLenght l -> l
+      in Right distance
+    (Path' (Path _ _ length' _ _), Stop' (Stop _ _ point1 _ _ _)) ->
+      Right 0
+    (Path' (Path _ _ length1 _ _), Path' (Path _ _ length2 _ _)) ->
+      let distance = case length2 of PathLenght l -> l
+      in Right distance
+    _ -> Left "Invalid stop or path"
+
+tripDistanceData :: [StopOrPath] -> Either String Float
+tripDistanceData [] = Right 0
+tripDistanceData [stopOrPath] = Right 0
+tripDistanceData input = 
+  let
+    valid = validateTripData input
+    in case valid of
+      Left e1 -> Left e1
+      Right _ -> tripDistanceData' input 0
+      
+  where
+    tripDistanceData' [] acc = Right acc
+    tripDistanceData' [stopOrPath] acc = Right acc
+    tripDistanceData' s@(h:t) acc =
+      let
+        distance = stopOrPathDistance h (head t)
+        in case distance of
+          Left e1 -> Left e1
+          Right distance' -> tripDistanceData' t (acc + distance')
 
 -- | An entity which represents your program's state.
 -- Currently it has no constructors but you can introduce

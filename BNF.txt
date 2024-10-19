@@ -9,11 +9,11 @@
 + <create_stop> ::= "create_stop(" <stop_id> ", " <name> ", " <point> ")"
 + <set_next_stop> ::= "set_next_stop(" <stop_id> ", " <route_id> ", " <next_stop_id> ")"
 + <set_previous_stop> ::= "set_previous_stop(" <stop_id> ", " <route_id> ", " <previous_stop_id> ")"
-+ <assign_stop_to_route> ::= "assign_stop_to_route(" <stopId> ", " <route_id ")" ~~not really needed in BNF
-+ <distance_between_stops> ::= "distance_between_stops(" <stop_id> ", " <stop_id> ")" ~~not really needed in BNF
++ <assign_stop_to_route> ::= "assign_stop_to_route(" <stopId> ", " <route_id ")"
++ <distance_between_stops> ::= "distance_between_stops(" <stop_id> ", " <stop_id> ")"
 
 
-+ <create_route> ::= "create_route(" <route_id> ", " <name> ", " <list_of_stop_ids> ")" -- update stop array (assign)
++ <create_route> ::= "create_route(" <route_id> ", " <name> ", " <list_of_stop_ids> ")"
 
 + <connect_route_stops_by_min_dist> ::= "connect_route_stops_by_min_dist(" <route_id> ")"
 + <check_if_route_stops_connected> ::= "check_if_route_stops_connected(" <route_id> ")" -- atleast n-1 previous connections and n-1 next connections
@@ -26,11 +26,11 @@
 + <create_trip> ::= "create_trip(" <trip_id> ", " <name> ", " <list_of_stops_paths_creat> ")"
 + <join_two_trips> ::= "join_two_trips(" <trip> ", " <trip> ", " <new_trip_id> ", " <new_name> ")"
 
-<cleanup_trip> ::= "cleanup_trip(" <trip> ")"
++ <cleanup_trip> ::= "cleanup_trip(" <trip> ")"
 + <validate_trip> ::= "validate_trip(" <trip> ")"
 + <find_next_stop> ::= "find_next_stop(" <stop_id> ", " <route_id> ")"
 + <find_previous_stop> ::= "find_previous_stop(" <stop_id> ", " <route_id> ")"
-<trip_distance> ::= "trip_distance(" <trip> ")"
++ <trip_distance> ::= "trip_distance(" <trip> ")"
 
 + <list_of_stop_ids> ::= <stop_id> "," <list_of_stop_ids> | <stop_id>
 + <list_of_stops_paths_creat> ::= <stop_or_path_or_creat> "," <list_of_stops_paths_creat> 
