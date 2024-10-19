@@ -25,3 +25,4 @@ BNF file changes:
 * ~~removed `<new_trip_id>` and `<new_route_id>` and replaced with `<trip_id>` and `<route_id>`. Reason: for better clarity.~~ Readded. Reason: for better clarity in BNF. Not recreated in `Lib2.hs`
 * added `<point>` which includes `<coord_x>` and `<coord_y>`
 * `<next_stop_id> ::= <stop_id> <previous_stop_id> ::= <stop_id>` before stop_id it was integer
+* added func (for debug or other): assign_stop_to_route, distance_betweem_stops, connect_route_stops_by_min_dist, check_if_route_stops_connected

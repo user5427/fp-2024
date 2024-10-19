@@ -16,20 +16,20 @@
 + <create_route> ::= "create_route(" <route_id> ", " <name> ", " <list_of_stop_ids> ")" -- update stop array (assign)
 
 + <connect_route_stops_by_min_dist> ::= "connect_route_stops_by_min_dist(" <route_id> ")"
-<check_if_route_stops_connected> ::= "check_if_route_stops_connected(" <route_id> ")" -- atleast n-1 previous connections and n-1 next connections
++ <check_if_route_stops_connected> ::= "check_if_route_stops_connected(" <route_id> ")" -- atleast n-1 previous connections and n-1 next connections
 
-+ <join_two_routes> ::= "join_two_routes(" <route> ", " <route> ", " <new_route_id> ", " <new_name> ")" -- does not support the <route> yet
-<join_two_routes_at_stop> ::= "join_two_routes_at_stop(" <route> ", " <route> ", " <stop_or_creat_or_nextprev> ", " <new_route_id> ", " <new_name> ")" -- min distance order
++ <join_two_routes> ::= "join_two_routes(" <route> ", " <route> ", " <new_route_id> ", " <new_name> ")"
++ <join_two_routes_at_stop> ::= "join_two_routes_at_stop(" <route> ", " <route> ", " <stop_or_creat_or_nextprev> ", " <new_route_id> ", " <new_name> ")"
 
 + <create_path> ::= "create_path(" <path_id> ", " <name> ", " <path_length> ", " <stop_id> ", " <stop_id> ")"
 
 + <create_trip> ::= "create_trip(" <trip_id> ", " <name> ", " <list_of_stops_paths_creat> ")"
-<join_two_trips> ::= "join_two_trips(" <trip> ", " <trip> ", " <new_trip_id> ", " <new_name> ")"
++ <join_two_trips> ::= "join_two_trips(" <trip> ", " <trip> ", " <new_trip_id> ", " <new_name> ")"
 
 <cleanup_trip> ::= "cleanup_trip(" <trip> ")"
-<validate_trip> ::= "validate_trip(" <trip> ")"
-+ <find_next_stop> ::= "find_next_stop(" <stop_id> ", " <route> ")"
-<find_previous_stop> ::= "find_previous_stop(" <stop_id> ", " <route> ")"
++ <validate_trip> ::= "validate_trip(" <trip> ")"
++ <find_next_stop> ::= "find_next_stop(" <stop_id> ", " <route_id> ")"
++ <find_previous_stop> ::= "find_previous_stop(" <stop_id> ", " <route_id> ")"
 <trip_distance> ::= "trip_distance(" <trip> ")"
 
 + <list_of_stop_ids> ::= <stop_id> "," <list_of_stop_ids> | <stop_id>
@@ -38,10 +38,10 @@
 + <list_of_stops_and_paths> ::= <stop_or_path> "," <list_of_stops_and_paths> 
                             | <stop_or_path> 
 
-+ <trip> ::= <trip_id> | <create_trip> -- <create_trip> get tripId
-<route> ::= <route_id> | <create_route> | <join_two_routes> | <join_two_routes_at_stop> -- technically get routeId only
-+ <stop_or_path_or_creat> ::= <create_stop> | <stop_or_path> | <find_next_stop> | <find_previous_stop> -- <create_stop> get stopId
-+ <stop_or_creat_or_nextprev> ::= <create_stop> | <stop_id> | <find_next_stop> | <find_previous_stop> -- <create_stop> get stopId
++ <trip> ::= <trip_id> | <create_trip> -- Trip
++ <route> ::= <route_id> | <create_route> | <join_two_routes> | <join_two_routes_at_stop> -- Route
++ <stop_or_path_or_creat> ::= <create_stop> | <stop_or_path> | <find_next_stop> | <find_previous_stop> -- StopOrPath
++ <stop_or_creat_or_nextprev> ::= <create_stop> | <stop_id> | <find_next_stop> | <find_previous_stop> -- Stop
 + <stop_or_path> ::= <stop_id> | <path_id>
 ~ <next_stop_id> ::= <stop_id>
 ~ <previous_stop_id> ::= <stop_id>
