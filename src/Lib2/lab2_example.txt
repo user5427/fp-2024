@@ -67,6 +67,10 @@ Right JoinTwoRoutes JoinTwoRoutes' JoinTwoRoutes Route' (RouteId 'R' 8555) JoinT
 parseQuery "join_two_trips(T5, create_trip(T2, B, create_stop(S65, 1, -48.952, 0.6), find_next_stop(S050, R65)), T99, 1X4R)"
 Right JoinTwoTrips Trip' (TripId 'T' 5) CreateTrip' CreateTrip TripId 'T' 2 Name "B" [CreateStop' CreateStop StopId 'S' 65 Name "1" Point (CoordX (-48.952)) (CoordY 0.6),FindNextStop' FindNextStop StopId 'S' 50 RouteId 'R' 65] TripId 'T' 99 Name "1X4R"
 
+parseQuery "join_two_routes(create_route(R4, s, create_stop(S0, I, -29.8, -72.19), find_previous_stop(S4, R2)), R9, R17, 2l_)"
+Right JoinTwoRoutes CreateRoute' CreateRoute RouteId 'R' 4 Name "s" [QueryStopOrCreatOrNextPrevCreateStop CreateStop StopId 'S' 0 Name "I" Point (CoordX (-29.8)) (CoordY (-72.19)),QueryStopOrCreatOrNextPrevFindPreviousStop FindPreviousStop StopId 'S' 4 RouteId 'R' 2] Route' (RouteId 'R' 9) RouteId 'R' 17 Name "2l_"
+
+
 emptyState
 stateWithQuery (emptyState) "create_stop(S1, PlsHelp, 0.55, 0.66)"
 Right (Just "Stop Name \"PlsHelp\" created",
@@ -125,3 +129,10 @@ Right (Just "Next stop set",
     routes = [Route (RouteId 'R' 1) (Name "imabouttodiefromhaskell") [StopId 'S' 1,StopId 'S' 2]], 
     paths = [], 
     trips = []})
+
+stateWithQuery (emptyState) "create_route(R1, imabouttodiefromhaskell, create_stop(S1, Pamiske_st, 0.454, 0.65456), create_stop(S2, Jovaro_st, 0.5555, 0.6556), create_stop(S3, Gelvonu_st, 0.55, 0.66))"
+Right (Just "Route Name \"imabouttodiefromhaskell\" created",
+    State {stops = [Stop (StopId 'S' 1) (Name "Pamiske_st") (Point (CoordX 0.454) (CoordY 0.65456)) [] [] [RouteId 'R' 1],Stop (StopId 'S' 2) (Name "Jovaro_st") (Point (CoordX 0.5555) (CoordY 0.6556)) [] [] [RouteId 'R' 1],Stop (StopId 'S' 3) (Name "Gelvonu_st") (Point (CoordX 0.55) (CoordY 0.66)) [] [] [RouteId 'R' 1]], 
+        routes = [Route (RouteId 'R' 1) (Name "imabouttodiefromhaskell") [StopId 'S' 1,StopId 'S' 2,StopId 'S' 3]], 
+        paths = [], 
+        trips = []})

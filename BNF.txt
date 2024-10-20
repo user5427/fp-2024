@@ -14,7 +14,7 @@
 <distance_between_stops> ::= "distance_between_stops(" <stop_id> ", " <stop_id> ")"
 
 
-<create_route> ::= "create_route(" <route_id> ", " <name> ", " <list_of_stop_ids> ")"
+<create_route> ::= "create_route(" <route_id> ", " <name> ", " <list_of_stop_or_creat_or_nextprev> ")"
 
 <connect_route_stops_by_min_dist> ::= "connect_route_stops_by_min_dist(" <route_id> ")"
 <check_if_route_stops_connected> ::= "check_if_route_stops_connected(" <route_id> ")"
@@ -33,11 +33,13 @@
 <find_previous_stop> ::= "find_previous_stop(" <stop_id> ", " <route_id> ")"
 <trip_distance> ::= "trip_distance(" <trip> ")"
 
-<list_of_stop_ids> ::= <stop_id> "," <list_of_stop_ids> | <stop_id>
-<list_of_stops_paths_creat> ::= <stop_or_path_or_creat> "," <list_of_stops_paths_creat> 
+<list_of_stop_ids> ::= <stop_id> ", " <list_of_stop_ids> | <stop_id>
+<list_of_stops_paths_creat> ::= <stop_or_path_or_creat> ", " <list_of_stops_paths_creat> 
                             | <stop_or_path_or_creat> 
-<list_of_stops_and_paths> ::= <stop_or_path> "," <list_of_stops_and_paths> 
+<list_of_stops_and_paths> ::= <stop_or_path> ", " <list_of_stops_and_paths> 
                             | <stop_or_path> 
+
+<list_of_stop_or_creat_or_nextprev> ::= <stop_or_creat_or_nextprev> ", " <list_of_stop_or_creat_or_nextprev> | <stop_or_creat_or_nextprev>
 
 <trip> ::= <trip_id> | <create_trip>
 <route> ::= <route_id> | <create_route> | <join_two_routes> | <join_two_routes_at_stop>

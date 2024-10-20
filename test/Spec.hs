@@ -36,7 +36,7 @@ unitTests = testGroup "Lib1 tests"
     -- Test parsing a valid create_route query
     testCase "Parsing a valid create_route query" $
       Lib2.parseQuery "create_route(R2, RouteName, S1, S2, S3)" @?= 
-        Right (Lib2.CreateRoute (Lib2.RouteId 'R' 2) (Lib2.Name "RouteName") [(Lib2.StopId 'S' 1), (Lib2.StopId 'S' 2), (Lib2.StopId 'S' 3)]),
+        Right (Lib2.CreateRoute (Lib2.RouteId 'R' 2) (Lib2.Name "RouteName") [Lib2.QueryStopOrCreatOrNextPrevStop (Lib2.StopId 'S' 1), Lib2.QueryStopOrCreatOrNextPrevStop  (Lib2.StopId 'S' 2), Lib2.QueryStopOrCreatOrNextPrevStop  (Lib2.StopId 'S' 3)]),
 
     -- Test parsing a valid create_trip query
     testCase "Parsing a valid create_trip query" $
