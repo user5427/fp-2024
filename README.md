@@ -26,6 +26,6 @@ BNF file changes:
 * added `<point>` which includes `<coord_x>` and `<coord_y>`
 * `<next_stop_id> ::= <stop_id>`, `<previous_stop_id> ::= <stop_id>` before stop_id it was integer
 * added func (for debug or other): assign_stop_to_route, distance_betweem_stops, connect_route_stops_by_min_dist, check_if_route_stops_connected
+* commands only found in BNF (only for clarity reasons) next_stop_id, previous_stop_id, new_name, new_trip_id, new_route_id
 
-
-things only in found in BNF next_stop_id, previous_stop_id, new_name, new_trip_id, new_route_id
+[Examples of parsing commands, changing state](src/Lib2/lab2_example.txt)
