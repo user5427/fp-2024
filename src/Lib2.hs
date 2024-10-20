@@ -12,10 +12,114 @@ import qualified Data.Char as C
 import qualified Data.List as L
 import Data.Functor.Classes (eq1)
 import Data.List (delete)
-import Lib2.AndOrMany (many, and2, and2', and3', and5', or2)
-import Lib2.ArrayFunc (getByExtractorFromArray, getByIndexFromArray, addToArray, updateArray, deleteFromArray, elementInArray)
-import Lessons.Lesson04(Parser)
 
+type Parser a = String -> Either String (a, String)
+many :: Parser a -> Parser [a]
+many p = many' p []
+    where
+        many' p' acc = \input ->
+            case p' input of
+                Left _ -> Right (acc, input)
+                Right (v, r) -> many' p' (acc ++ [v]) r
+
+and2 :: Parser a -> Parser b -> Parser (a, b)
+and2 a b = \input ->
+    case a input of
+        Right (v1, r1) ->
+            case b r1 of
+                Right (v2, r2) -> Right ((v1, v2), r2)
+                Left e2 -> Left e2
+        Left e1 -> Left e1
+
+and2' :: (a -> b -> c) -> Parser a -> Parser b -> Parser c
+and2' c a b = \input ->
+    case a input of
+        Right (v1, r1) ->
+            case b r1 of
+                Right (v2, r2) -> Right (c v1 v2, r2)
+                Left e2 -> Left e2
+        Left e1 -> Left e1
+
+and3' :: (a -> b -> c -> d) -> Parser a -> Parser b -> Parser c -> Parser d
+and3' f a b c = \input ->
+    case a input of
+        Right (v1, r1) ->
+            case b r1 of
+                Right (v2, r2) ->
+                    case c r2 of
+                        Right (v3, r3) -> Right (f v1 v2 v3, r3)
+                        Left e3 -> Left e3
+                Left e2 -> Left e2
+        Left e1 -> Left e1
+
+and5' :: (a -> b -> c -> d -> e -> f) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f
+and5' f a b c d e = \input ->
+    case a input of
+        Right (v1, r1) ->
+            case b r1 of
+                Right (v2, r2) ->
+                    case c r2 of
+                        Right (v3, r3) ->
+                            case d r3 of
+                                Right (v4, r4) ->
+                                    case e r4 of
+                                        Right (v5, r5) -> Right (f v1 v2 v3 v4 v5, r5)
+                                        Left e5 -> Left e5
+                                Left e4 -> Left e4
+                        Left e3 -> Left e3
+                Left e2 -> Left e2
+        Left e1 -> Left e1
+
+or2 :: Parser a -> Parser a -> Parser a
+or2 a b = \input ->
+    case a input of
+        Right r1 -> Right r1
+        Left e1 ->
+            case b input of
+                Right r2 -> Right r2
+                Left e2 -> Left (e1 ++ ", " ++ e2)
+getByExtractorFromArray :: Eq a => a -> (b -> a) -> [b] -> Either String b
+getByExtractorFromArray = getByIndexFromArray'
+  where
+    getByIndexFromArray' _ _ [] = Left "Element not found"
+    getByIndexFromArray' value' extractor' (h:t) =
+      if value' == extractor' h
+      then Right h
+      else getByIndexFromArray' value' extractor' t
+
+getByIndexFromArray :: Eq a => Int -> [a] -> Either String a
+getByIndexFromArray index arr = getByIndexFromArray' index arr 0
+  where
+    getByIndexFromArray' _ [] _ = Left "Element not found"
+    getByIndexFromArray' index' (h:t) i = if index' == i then Right h else getByIndexFromArray' index' t (i + 1)
+
+getIndexFromArray :: Eq a => a -> [a] -> Either String Int
+getIndexFromArray target arr = getIndexFromArray' target arr 0
+  where
+    getIndexFromArray' _ [] _ = Left "Element not found"
+    getIndexFromArray' target' (h:t) index = if target' == h then Right index else getIndexFromArray' target' t (index + 1)
+
+addToArray :: Eq a => a -> [a] -> Either String [a]
+addToArray = addToArray' []
+  where
+    addToArray' acc target [] = Right (acc ++ [target])
+    addToArray' acc target (h:t) = if target == h then Left "Element already exists" else Right (acc ++ [h] ++ t)
+
+updateArray :: Eq a => a -> a -> [a] ->  Either String [a]
+updateArray = updateArray' []
+  where
+    updateArray' _ _ _ [] = Left "Element not found"
+    updateArray' acc target new (h:t) = if target == h then Right (acc ++ [new] ++ t) else updateArray' (acc ++ [h]) target new t
+
+deleteFromArray :: Eq a => a -> [a] -> Either String [a]
+deleteFromArray = deleteFromArray' []
+  where
+    deleteFromArray' _ _ [] = Left "Element not found"
+    deleteFromArray' acc target (h:t) = if target == h then Right (acc ++ t) else deleteFromArray' (acc ++ [h]) target t
+
+elementInArray :: Eq a => a -> [a] -> Bool
+elementInArray _ [] = False
+elementInArray target (h:t) = if target == h then True else elementInArray target t
 -- | An entity which represets user input.
 -- It should match the grammar from Laboratory work #1.
 -- Currently it has no constructors but you can introduce
@@ -45,10 +149,49 @@ data Query
 
 -- | The instances are needed basically for tests
 instance Eq Query where
-  (==) _ _= False
+  (==) aQ bQ = 
+    case (aQ, bQ) of
+      (CreateStop a1 a2 a3, CreateStop b1 b2 b3) -> a1 == b1 && a2 == b2 && a3 == b3
+      (CreateRoute a1 a2 a3, CreateRoute b1 b2 b3) -> a1 == b1 && a2 == b2 && a3 == b3
+      (CreatePath a1 a2 a3 a4 a5, CreatePath b1 b2 b3 b4 b5) -> a1 == b1 && a2 == b2 && a3 == b3 && a4 == b4 && a5 == b5
+      (CreateTrip a1 a2 a3, CreateTrip b1 b2 b3) -> a1 == b1 && a2 == b2 && a3 == b3
+      (JoinTwoTrips a1 a2 a3 a4, JoinTwoTrips b1 b2 b3 b4) -> a1 == b1 && a2 == b2 && a3 == b3 && a4 == b4
+      (JoinTwoRoutes a1 a2 a3 a4, JoinTwoRoutes b1 b2 b3 b4) -> a1 == b1 && a2 == b2 && a3 == b3 && a4 == b4
+      (JoinTwoRoutesAtStop a1 a2 a3 a4 a5, JoinTwoRoutesAtStop b1 b2 b3 b4 b5) -> a1 == b1 && a2 == b2 && a3 == b3 && a4 == b4 && a5 == b5
+      (CleanupTrip a1, CleanupTrip b1) -> a1 == b1
+      (ValidateTrip a1, ValidateTrip b1) -> a1 == b1
+      (FindNextStop a1 a2, FindNextStop b1 b2) -> a1 == b1 && a2 == b2
+      (FindPreviousStop a1 a2, FindPreviousStop b1 b2) -> a1 == b1 && a2 == b2
+      (TripDistance a1, TripDistance b1) -> a1 == b1
+      (SetNextStop a1 a2 a3, SetNextStop b1 b2 b3) -> a1 == b1 && a2 == b2 && a3 == b3
+      (SetPreviousStop a1 a2 a3, SetPreviousStop b1 b2 b3) -> a1 == b1 && a2 == b2 && a3 == b3
+      (ConnectRouteStopsByMinDistance a1, ConnectRouteStopsByMinDistance b1) -> a1 == b1
+      (CheckIfRouteStopsConnected a1, CheckIfRouteStopsConnected b1) -> a1 == b1
+      (DistanceBetweenStops a1 a2, DistanceBetweenStops b1 b2) -> a1 == b1 && a2 == b2
+      (AssignStopToRoute a1 a2, AssignStopToRoute b1 b2) -> a1 == b1 && a2 == b2
+      _ -> False
 
 instance Show Query where
-  show _ = ""
+  show query = 
+    case query of
+      CreateStop stopId name point -> "CreateStop " ++ show stopId ++ " " ++ show name ++ " " ++ show point
+      CreateRoute routeId name stopIds -> "CreateRoute " ++ show routeId ++ " " ++ show name ++ " " ++ show stopIds
+      CreatePath pathId name pathLenght stopId1 stopId2 -> "CreatePath " ++ show pathId ++ " " ++ show name ++ " " ++ show pathLenght ++ " " ++ show stopId1 ++ " " ++ show stopId2
+      CreateTrip tripId name stops' -> "CreateTrip " ++ show tripId ++ " " ++ show name ++ " " ++ show stops'
+      JoinTwoTrips trip1 trip2 newTripId newName -> "JoinTwoTrips " ++ show trip1 ++ " " ++ show trip2 ++ " " ++ show newTripId ++ " " ++ show newName
+      JoinTwoRoutes route1 route2 newRouteId newName -> "JoinTwoRoutes " ++ show route1 ++ " " ++ show route2 ++ " " ++ show newRouteId ++ " " ++ show newName
+      JoinTwoRoutesAtStop route1 route2 stopOrCreatOrNextPrev newRouteId newName -> "JoinTwoRoutesAtStop " ++ show route1 ++ " " ++ show route2 ++ " " ++ show stopOrCreatOrNextPrev ++ " " ++ show newRouteId ++ " " ++ show newName
+      CleanupTrip trip -> "CleanupTrip " ++ show trip
+      ValidateTrip trip -> "ValidateTrip " ++ show trip
+      FindNextStop stopId routeId -> "FindNextStop " ++ show stopId ++ " " ++ show routeId
+      FindPreviousStop stopId routeId -> "FindPreviousStop " ++ show stopId ++ " " ++ show routeId
+      TripDistance trip -> "TripDistance " ++ show trip
+      SetNextStop stopId routeId nextStopId -> "SetNextStop " ++ show stopId ++ " " ++ show routeId ++ " " ++ show nextStopId
+      SetPreviousStop stopId routeId previousStopId -> "SetPreviousStop " ++ show stopId ++ " " ++ show routeId ++ " " ++ show previousStopId
+      ConnectRouteStopsByMinDistance routeId -> "ConnectRouteStopsByMinDistance " ++ show routeId
+      CheckIfRouteStopsConnected routeId -> "CheckIfRouteStopsConnected " ++ show routeId
+      DistanceBetweenStops stopId1 stopId2 -> "DistanceBetweenStops " ++ show stopId1 ++ " " ++ show stopId2
+      AssignStopToRoute stopId routeId -> "AssignStopToRoute " ++ show stopId ++ " " ++ show routeId
 
 -- HELPER FUNCTIONS
 parseExact :: String -> Parser String
