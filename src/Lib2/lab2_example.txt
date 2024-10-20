@@ -1,0 +1,112 @@
+parseQuery "create_stop(S1, PlsHelp, 0.55, 0.66)"
+Right CreateStop StopId 'S' 1 Name "PlsHelp" Point (CoordX 0.55) (CoordY 0.66)
+
+parseQuery "create_route(R1, imabouttodiefromhaskell, S1, S2, S3)"
+Right CreateRoute RouteId 'R' 1 Name "imabouttodiefromhaskell" [StopId 'S' 1,StopId 'S' 2,StopId 'S' 3]
+
+parseQuery "create_path(P1, path, 1.0, S1, S2)"
+Right CreatePath PathId 'P' 1 Name "path" PathLenght 1.0 StopId 'S' 1 StopId 'S' 2
+
+parseQuery "create_trip(T1, trip, S1, S2, P1, S3)"
+Right CreateTrip TripId 'T' 1 Name "trip" [QueryStopOrPath' (StopId' (StopId 'S' 1)),QueryStopOrPath' (StopId' (StopId 'S' 2)),QueryStopOrPath' (PathId' (PathId 'P' 1)),QueryStopOrPath' (StopId' (StopId 'S' 3))]
+
+parseQuery "find_next_stop(S1, R1)"
+Right FindNextStop StopId 'S' 1 RouteId 'R' 1
+
+parseQuery "find_previous_stop(S1, R1)"
+Right FindPreviousStop StopId 'S' 1 RouteId 'R' 1
+
+parseQuery "set_next_stop(S1, R1, S2)"
+Right SetNextStop StopId 'S' 1 RouteId 'R' 1 StopId 'S' 2
+
+parseQuery "set_previous_stop(S1, R1, S2)"
+Right SetPreviousStop StopId 'S' 1 RouteId 'R' 1 StopId 'S' 2
+
+parseQuery "join_two_trips(T1, T2, T3, NewTrip)"
+Right JoinTwoTrips Trip' (TripId 'T' 1) Trip' (TripId 'T' 2) TripId 'T' 3 Name "NewTrip"
+
+parseQuery "assign_stop_to_route(S1, R1)"
+Right AssignStopToRoute StopId 'S' 1 RouteId 'R' 1
+
+parseQuery "distance_between_stops(S1, S2)"
+Right DistanceBetweenStops StopId 'S' 1 StopId 'S' 2
+
+parseQuery "check_if_route_stops_connected(R1)"
+Right CheckIfRouteStopsConnected RouteId 'R' 1
+
+parseQuery "connect_route_stops_by_min_dist(R1)"
+Right ConnectRouteStopsByMinDistance RouteId 'R' 1
+
+parseQuery "trip_distance(T1)"
+Right TripDistance Trip' (TripId 'T' 1)
+
+parseQuery "validate_trip(T1)"
+Right ValidateTrip Trip' (TripId 'T' 1)
+
+parseQuery "cleanup_trip(T1)"
+Right CleanupTrip Trip' (TripId 'T' 1)
+
+parseQuery "join_two_routes(R1, R2, R3, new_route)"
+Right JoinTwoRoutes Route' (RouteId 'R' 1) Route' (RouteId 'R' 2) RouteId 'R' 3 Name "new_route"
+
+parseQuery "join_two_routes_at_stop(R1, R2, S1, R3, NewRoute)"
+Right JoinTwoRoutesAtStop Route' (RouteId 'R' 1) Route' (RouteId 'R' 2) QueryStopOrCreatOrNextPrevStop (StopId 'S' 1) RouteId 'R' 3 Name "NewRoute"
+
+emptyState
+stateWithQuery (emptyState) "create_stop(S1, PlsHelp, 0.55, 0.66)"
+Right (Just "Stop Name \"PlsHelp\" created",
+       State {stops = [Stop (StopId 'S' 1) (Name "PlsHelp") (Point (CoordX 0.55) (CoordY 0.66)) [] [] []], 
+              routes = [], 
+              paths = [], 
+              trips = []})
+
+stateWithQuery (emptyState) "create_route(R1, imabouttodiefromhaskell, S1, S2, S3)"
+"Element not found"
+
+stateWithQuery (emptyState) "create_path(P1, path, 1.0, S1, S2)"
+"Element not found"
+
+stateWithQuery (emptyState) "create_trip(T1, trip, S1, S2, P1, S3)"
+"Element not found" - stops or paths not found basically
+
+multiQuery (stateWithQuery (emptyState) "create_stop(S1, PlsHelp, 0.55, 0.66)") "create_route(R1, imabouttodiefromhaskell, S1)"
+Right (Just "Route Name \"imabouttodiefromhaskell\" created",
+    State {stops = [Stop (StopId 'S' 1) (Name "PlsHelp") (Point (CoordX 0.55) (CoordY 0.66)) [] [] [RouteId 'R' 1]], 
+            routes = [Route (RouteId 'R' 1) (Name "imabouttodiefromhaskell") [StopId 'S' 1]], 
+            paths = [], 
+            trips = []})
+
+multiQuery (multiQuery (stateWithQuery (emptyState) "create_stop(S1, PlsHelp, 0.55, 0.66)") "create_route(R1, imabouttodiefromhaskell, S1)") "create_stop(S1, PlsHelp, 0.55, 0.66)"
+Right (Just "Stop Name \"PlsHelp\" created",
+    State {stops = [Stop (StopId 'S' 1) (Name "PlsHelp") (Point (CoordX 0.55) (CoordY 0.66)) [] [] [RouteId 'R' 1]], 
+        routes = [Route (RouteId 'R' 1) (Name "imabouttodiefromhaskell") [StopId 'S' 1]], 
+        paths = [], 
+        trips = []})
+
+multiQuery (multiQuery (stateWithQuery (emptyState) "create_stop(S1, PlsHelp, 0.55, 0.66)") "create_route(R1, imabouttodiefromhaskell, S1)") "create_stop(S1, PlsHelp, 0.55, 0.66)"
+Left "Stop already exists"
+
+multiQuery (multiQuery (stateWithQuery (emptyState) "create_stop(S1, PlsHelp, 0.55, 0.66)") "create_route(R1, imabouttodiefromhaskell, S1)") "create_stop(S2, PlsHelp, 0.55, 0.66)"
+Right (Just "Stop Name \"PlsHelp\" created",
+    State {stops = [Stop (StopId 'S' 1) (Name "PlsHelp") (Point (CoordX 0.55) (CoordY 0.66)) [] [] [RouteId 'R' 1],Stop (StopId 'S' 2) (Name "PlsHelp") (Point (CoordX 0.55) (CoordY 0.66)) [] [] []], 
+    routes = [Route (RouteId 'R' 1) (Name "imabouttodiefromhaskell") [StopId 'S' 1]], 
+    paths = [], 
+    trips = []})
+
+multiQuery (multiQuery (multiQuery (stateWithQuery (emptyState) "create_stop(S1, PlsHelp, 0.55, 0.66)") "create_route(R1, imabouttodiefromhaskell, S1)") "create_stop(S2, PlsHelp, 0.55, 0.66)") "assign_stop_to_route(S2, R1)"
+Right (Just "Stop Name \"PlsHelp\" assigned to route.",
+    State {stops = [Stop (StopId 'S' 1) (Name "PlsHelp") (Point (CoordX 0.55) (CoordY 0.66)) [] [] [RouteId 'R' 1],Stop (StopId 'S' 2) (Name "PlsHelp") (Point (CoordX 0.55) (CoordY 0.66)) [] [] [RouteId 'R' 1]], 
+    routes = [Route (RouteId 'R' 1) (Name "imabouttodiefromhaskell") [StopId 'S' 1,StopId 'S' 2]], 
+    paths = [], 
+    trips = []})
+
+multiQuery (multiQuery (multiQuery (multiQuery (stateWithQuery (emptyState) "create_stop(S1, PlsHelp, 0.55, 0.66)") "create_route(R1, imabouttodiefromhaskell, S1)") "create_stop(S2, PlsHelp, 0.55, 0.66)") "assign_stop_to_route(S2, R1)") "set_next_stop(S2, R1, S1)"
+Left "Distance between stops is 0"
+
+multiQuery (multiQuery (multiQuery (multiQuery (stateWithQuery (emptyState) "create_stop(S1, PlsHelp, 0.45, 0.46)") "create_route(R1, imabouttodiefromhaskell, S1)") "create_stop(S2, PlsHelp, 0.55, 0.66)") "assign_stop_to_route(S2, R1)") "set_next_stop(S2, R1, S1)"
+Right (Just "Next stop set",
+    State {stops = [Stop (StopId 'S' 1) (Name "PlsHelp") (Point (CoordX 0.45) (CoordY 0.46)) [] [] [RouteId 'R' 1],
+    Stop (StopId 'S' 2) (Name "PlsHelp") (Point (CoordX 0.55) (CoordY 0.66)) [NextStop (StopId 'S' 1) (RouteId 'R' 1)] [] [RouteId 'R' 1]], 
+    routes = [Route (RouteId 'R' 1) (Name "imabouttodiefromhaskell") [StopId 'S' 1,StopId 'S' 2]], 
+    paths = [], 
+    trips = []})

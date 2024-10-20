@@ -1,4 +1,4 @@
-<command> ::= +<create_stop> | <create_route> | <join_two_routes> | 
+<command> ::= <create_stop> | <create_route> | <join_two_routes> | 
 <join_two_routes_at_stop> | <join_two_trips> | 
 <create_path> | <create_trip> |
 <validate_trip> | <cleanup_trip> | <trip_distance> |
@@ -7,62 +7,62 @@
 <distance_between_stops> | <assign_stop_to_route> |
 <find_next_stop> | <find_previous_stop>
 
-+ <create_stop> ::= "create_stop(" <stop_id> ", " <name> ", " <point> ")"
-+ <set_next_stop> ::= "set_next_stop(" <stop_id> ", " <route_id> ", " <next_stop_id> ")"
-+ <set_previous_stop> ::= "set_previous_stop(" <stop_id> ", " <route_id> ", " <previous_stop_id> ")"
-+ <assign_stop_to_route> ::= "assign_stop_to_route(" <stopId> ", " <route_id ")"
-+ <distance_between_stops> ::= "distance_between_stops(" <stop_id> ", " <stop_id> ")"
+<create_stop> ::= "create_stop(" <stop_id> ", " <name> ", " <point> ")"
+<set_next_stop> ::= "set_next_stop(" <stop_id> ", " <route_id> ", " <next_stop_id> ")"
+<set_previous_stop> ::= "set_previous_stop(" <stop_id> ", " <route_id> ", " <previous_stop_id> ")"
+<assign_stop_to_route> ::= "assign_stop_to_route(" <stop_id> ", " <route_id> ")"
+<distance_between_stops> ::= "distance_between_stops(" <stop_id> ", " <stop_id> ")"
 
 
-+ <create_route> ::= "create_route(" <route_id> ", " <name> ", " <list_of_stop_ids> ")"
+<create_route> ::= "create_route(" <route_id> ", " <name> ", " <list_of_stop_ids> ")"
 
-+ <connect_route_stops_by_min_dist> ::= "connect_route_stops_by_min_dist(" <route_id> ")"
-+ <check_if_route_stops_connected> ::= "check_if_route_stops_connected(" <route_id> ")" -- atleast n-1 previous connections and n-1 next connections
+<connect_route_stops_by_min_dist> ::= "connect_route_stops_by_min_dist(" <route_id> ")"
+<check_if_route_stops_connected> ::= "check_if_route_stops_connected(" <route_id> ")"
 
-+ <join_two_routes> ::= "join_two_routes(" <route> ", " <route> ", " <new_route_id> ", " <new_name> ")"
-+ <join_two_routes_at_stop> ::= "join_two_routes_at_stop(" <route> ", " <route> ", " <stop_or_creat_or_nextprev> ", " <new_route_id> ", " <new_name> ")"
+<join_two_routes> ::= "join_two_routes(" <route> ", " <route> ", " <new_route_id> ", " <new_name> ")"
+<join_two_routes_at_stop> ::= "join_two_routes_at_stop(" <route> ", " <route> ", " <stop_or_creat_or_nextprev> ", " <new_route_id> ", " <new_name> ")"
 
-+ <create_path> ::= "create_path(" <path_id> ", " <name> ", " <path_length> ", " <stop_id> ", " <stop_id> ")"
+<create_path> ::= "create_path(" <path_id> ", " <name> ", " <path_length> ", " <stop_id> ", " <stop_id> ")"
 
-+ <create_trip> ::= "create_trip(" <trip_id> ", " <name> ", " <list_of_stops_paths_creat> ")"
-+ <join_two_trips> ::= "join_two_trips(" <trip> ", " <trip> ", " <new_trip_id> ", " <new_name> ")"
+<create_trip> ::= "create_trip(" <trip_id> ", " <name> ", " <list_of_stops_paths_creat> ")"
+<join_two_trips> ::= "join_two_trips(" <trip> ", " <trip> ", " <new_trip_id> ", " <new_name> ")"
 
-+ <cleanup_trip> ::= "cleanup_trip(" <trip> ")"
-+ <validate_trip> ::= "validate_trip(" <trip> ")"
-+ <find_next_stop> ::= "find_next_stop(" <stop_id> ", " <route_id> ")"
-+ <find_previous_stop> ::= "find_previous_stop(" <stop_id> ", " <route_id> ")"
-+ <trip_distance> ::= "trip_distance(" <trip> ")"
+<cleanup_trip> ::= "cleanup_trip(" <trip> ")"
+<validate_trip> ::= "validate_trip(" <trip> ")"
+<find_next_stop> ::= "find_next_stop(" <stop_id> ", " <route_id> ")"
+<find_previous_stop> ::= "find_previous_stop(" <stop_id> ", " <route_id> ")"
+<trip_distance> ::= "trip_distance(" <trip> ")"
 
-+ <list_of_stop_ids> ::= <stop_id> "," <list_of_stop_ids> | <stop_id>
-+ <list_of_stops_paths_creat> ::= <stop_or_path_or_creat> "," <list_of_stops_paths_creat> 
+<list_of_stop_ids> ::= <stop_id> "," <list_of_stop_ids> | <stop_id>
+<list_of_stops_paths_creat> ::= <stop_or_path_or_creat> "," <list_of_stops_paths_creat> 
                             | <stop_or_path_or_creat> 
-+ <list_of_stops_and_paths> ::= <stop_or_path> "," <list_of_stops_and_paths> 
+<list_of_stops_and_paths> ::= <stop_or_path> "," <list_of_stops_and_paths> 
                             | <stop_or_path> 
 
-+ <trip> ::= <trip_id> | <create_trip> -- Trip
-+ <route> ::= <route_id> | <create_route> | <join_two_routes> | <join_two_routes_at_stop> -- Route
-+ <stop_or_path_or_creat> ::= <create_stop> | <stop_or_path> | <find_next_stop> | <find_previous_stop> -- StopOrPath
-+ <stop_or_creat_or_nextprev> ::= <create_stop> | <stop_id> | <find_next_stop> | <find_previous_stop> -- Stop
-+ <stop_or_path> ::= <stop_id> | <path_id>
-~ <next_stop_id> ::= <stop_id>
-~ <previous_stop_id> ::= <stop_id>
-+ <name> ::= <string>
-~ <new_name> ::= <name>
-~ <new_trip_id> ::= <trip_id>
-~ <new_route_id> ::= <route_id>
-+ <point> ::= <coord_x> ", " <coord_y>
-+ <coord_x> ::= <float>
-+ <coord_y> ::= <float>
-+ <path_length> ::= <float>
-+ <path_id> ::= "P" <integer>
-+ <stop_id> ::= "S" <integer>
-+ <route_id> ::= "R" <integer>
-+ <trip_id> ::= "T" <integer>
-+ <float> ::= <pos> | "-" <pos>
-+ <integer> ::= [0-9]+
-+ <pos> ::= ("0" |  [1-9] [0-9]*) ("." [0-9]+ )?
-+ <string> ::= <character> <string> | <character>
-+ <character> ::= [1-9] | [A-Z] | [a-z] | "_"
+<trip> ::= <trip_id> | <create_trip>
+<route> ::= <route_id> | <create_route> | <join_two_routes> | <join_two_routes_at_stop>
+<stop_or_path_or_creat> ::= <create_stop> | <stop_or_path> | <find_next_stop> | <find_previous_stop>
+<stop_or_creat_or_nextprev> ::= <create_stop> | <stop_id> | <find_next_stop> | <find_previous_stop>
+<stop_or_path> ::= <stop_id> | <path_id>
+<next_stop_id> ::= <stop_id>
+<previous_stop_id> ::= <stop_id>
+<name> ::= <string>
+<new_name> ::= <name>
+<new_trip_id> ::= <trip_id>
+<new_route_id> ::= <route_id>
+<point> ::= <coord_x> ", " <coord_y>
+<coord_x> ::= <float>
+<coord_y> ::= <float>
+<path_length> ::= <float>
+<path_id> ::= "P" <integer>
+<stop_id> ::= "S" <integer>
+<route_id> ::= "R" <integer>
+<trip_id> ::= "T" <integer>
+<float> ::= <pos> | "-" <pos>
+<integer> ::= [0-9]+
+<pos> ::= ("0" |  [1-9] [0-9]*) ("." [0-9]+ )?
+<string> ::= <character> <string> | <character>
+<character> ::= [1-9] | [A-Z] | [a-z] | "_"
 
 
 
