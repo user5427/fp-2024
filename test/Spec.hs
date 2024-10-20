@@ -46,6 +46,11 @@ unitTests = testGroup "Lib1 tests"
     -- Test parsing a valid CreatePath query
     testCase "Parsing a valid CreatePath query" $
       Lib2.parseQuery "create_path(P1, path, 10.0, S1, S2)" @?=
-        Right (Lib2.CreatePath (Lib2.PathId 'P' 1) (Lib2.Name "path") (Lib2.PathLenght 10.0) (Lib2.StopId 'S' 1) (Lib2.StopId 'S' 2) )
+        Right (Lib2.CreatePath (Lib2.PathId 'P' 1) (Lib2.Name "path") (Lib2.PathLenght 10.0) (Lib2.StopId 'S' 1) (Lib2.StopId 'S' 2) ),
+
+    -- Test parsing a large query
+    testCase "Parsing large query" $
+      Lib2.parseQuery "join_two_trips(T5, create_trip(T2, B, create_stop(S65, 1, -48.952, 0.6), find_next_stop(S050, R65)), T99, 1X4R)" @?=
+        Right (Lib2.JoinTwoTrips (Lib2.Trip' (Lib2.TripId 'T' 5)) (Lib2.CreateTrip' (Lib2.CreateTrip (Lib2.TripId 'T' 2) (Lib2.Name "B") [Lib2.CreateStop' (Lib2.CreateStop (Lib2.StopId 'S' 65) (Lib2.Name "1") (Lib2.Point (Lib2.CoordX (-48.952)) (Lib2.CoordY 0.6))),Lib2.FindNextStop' (Lib2.FindNextStop (Lib2.StopId 'S' 50) (Lib2.RouteId 'R' 65))])) (Lib2.TripId 'T' 99) (Lib2.Name "1X4R"))
 
   ]
