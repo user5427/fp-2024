@@ -785,11 +785,16 @@ createTrip state query' =
   case query' of
     (CreateTrip tripId name stopOrPathList) ->
       let
-        trip = Trip tripId name stopOrPathList -- FIXME CHANGE IT TO STOPORPATH
-        addTrip' = addTrip trip state
-        in case addTrip' of
-          Left e1 -> Left e1
-          Right newState -> Right (trip, newState)
+        parseStopOrPathOrCreat = parseQueryStopOrPathOrCreatListData stopOrPathList state
+        in case parseStopOrPathOrCreat of 
+          Left e994 -> Left e994
+          Right (stopsAndPaths, state'''') ->
+            let
+              trip = Trip tripId name stopsAndPaths -- FIXME CHANGE IT TO STOPORPATH
+              addTrip' = addTrip trip state''''
+              in case addTrip' of
+                Left e1 -> Left e1
+                Right newState -> Right (trip, newState)
     _ -> Left "Not a create trip query"
 -- <create_path> ::= "create_path(" <path_id> ", " <name> ", " <path_length> ", " <stop_id> ", " <stop_id> ")"
 data Path = Path PathId Name PathLenght StopId StopId deriving (Show, Eq)
@@ -805,7 +810,7 @@ createPath state query' =
           Right newState -> Right (path, newState)
     _ -> Left "Not a create path query"
 -- <assign_stop_to_route> ::= "assign_stop_to_route(" <stopId> ", " <route_id ")"
-assignStopToRoute :: State -> Query -> Either String State
+assignStopToRoute :: State -> Query -> Either String (Stop, State)
 assignStopToRoute state query' =
   case query' of
     (AssignStopToRoute stopId routeId) ->
@@ -820,7 +825,7 @@ assignStopToRoute state query' =
                 Left e2 -> Left e2
                 Right stop' ->
                   let
-                    updateStop = updateOrAddStop stop' state
+                    updateStop = updateOrAddStops [stop'] state
                     in case updateStop of
                       Left e2 -> Left e2
                       Right newState -> 
@@ -833,7 +838,7 @@ assignStopToRoute state query' =
                                 updatedRoute = Route rid name (stops' ++ [stopId])
                                 in case updateRoute updatedRoute newState of
                                   Left e4 -> Left e4
-                                  Right finalState -> Right finalState
+                                  Right finalState -> Right (stop', finalState)
     _ -> Left "Not an assign stop to route query"
 assignStopToRouteData :: Stop -> RouteId -> Either String Stop
 assignStopToRouteData stop routeId =
@@ -886,8 +891,8 @@ setNextStop state query' =
                       Left e3 -> Left e3
                       Right stop'' ->
                         let
-                          updateStop = updateStop stop'' state
-                          in case updateStop of
+                          updateStop' = updateStop stop'' state
+                          in case updateStop' of
                             Left e4 -> Left e4
                             Right newState -> Right newState
     _ -> Left "Not a set next stop query"
@@ -935,8 +940,8 @@ setPreviousStop state query' =
                       Left e3 -> Left e3
                       Right stop'' ->
                         let
-                          updateStop = updateStop stop'' state
-                          in case updateStop of
+                          updateStop' = updateStop stop'' state
+                          in case updateStop' of
                             Left e4 -> Left e4
                             Right newState -> Right newState
     _ -> Left "Not a set previous stop query"
@@ -1133,18 +1138,23 @@ validateTrip state query' =
   case query' of
     (ValidateTrip tripId) ->
       let
-        trip = getByExtractorFromArray tripId (\(Trip tid _ _) -> tid) (trips state)
-        in case trip of
+        tripFromQuery = parseQueryTripData tripId state
+        in case tripFromQuery of
           Left e1 -> Left e1
-          Right foundTrip@(Trip _ _ stopOrPathList) ->
+          Right (new@(Trip tid' _ _), state'') ->
             let
-              connected = validateTripData stopOrPathList
-              in case connected of
-                Left e2 -> Left e2
-                Right connected' ->
+              trip = getByExtractorFromArray tid' (\(Trip tid _ _) -> tid) (trips state'')
+              in case trip of
+                Left e1 -> Left e1
+                Right foundTrip@(Trip _ _ stopOrPathList) ->
                   let
-                    in if connected' then Right (True, state)
-                    else Right (False, state)
+                    connected = validateTripData stopOrPathList
+                    in case connected of
+                      Left e2 -> Left e2
+                      Right connected' ->
+                        let
+                          in if connected' then Right (True, state'')
+                          else Right (False, state'')
     _ -> Left "Not a validate trip query"
 validateTripData :: [StopOrPath] -> Either String Bool
 validateTripData [] = Right True
@@ -1199,20 +1209,25 @@ cleanupTrip state query' =
   case query' of
     (CleanupTrip tripId) -> -- FIXME
       let
-        trip = getByExtractorFromArray tripId (\(Trip tid _ _) -> tid) (trips state)
-        in case trip of
+        tripFromQuery = parseQueryTripData tripId state
+        in case tripFromQuery of
           Left e1 -> Left e1
-          Right foundTrip@(Trip _ _ stopOrPathList) -> -- stopOrPathList FIXME not same type
+          Right (new@(Trip tid' _ _), state'''') ->
             let
-              cleaned = cleanupTripData stopOrPathList
-              in case cleaned of
-                Left e2 -> Left e2
-                Right cleaned' ->
+              trip = getByExtractorFromArray tid' (\(Trip tid _ _) -> tid) (trips state'''')
+              in case trip of
+                Left e1 -> Left e1
+                Right foundTrip@(Trip _ _ stopOrPathList) -> -- stopOrPathList FIXME not same type
                   let
-                    updatedTrip = Trip tripId (case foundTrip of Trip _ name _ -> name) cleaned'
-                    in case updateTrip updatedTrip state of
-                      Left e3 -> Left e3
-                      Right newState -> Right newState
+                    cleaned = cleanupTripData stopOrPathList
+                    in case cleaned of
+                      Left e2 -> Left e2
+                      Right cleaned' ->
+                        let
+                          updatedTrip = Trip tid' (case foundTrip of Trip _ name _ -> name) cleaned'
+                          in case updateTrip updatedTrip state'''' of
+                            Left e3 -> Left e3
+                            Right newState -> Right newState
     _ -> Left "Not a cleanup trip query"
 -- basically add one element and check if it is valid, if yes continue adding if no, then just return the valid part
 cleanupTripData :: [StopOrPath] -> Either String [StopOrPath]
@@ -1234,15 +1249,20 @@ tripDistance state query' =
   case query' of
     (TripDistance tripId) ->
       let
-        trip = getByExtractorFromArray tripId (\(Trip tid _ _) -> tid) (trips state)
-        in case trip of
+        tripFromQueryTrip = parseQueryTripData tripId state
+        in case tripFromQueryTrip of
           Left e1 -> Left e1
-          Right foundTrip@(Trip _ _ stopOrPathList) ->
+          Right (trip@(Trip tid' _ _), state') -> 
             let
-              distance = tripDistanceData stopOrPathList
-              in case distance of
-                Left e2 -> Left e2
-                Right distance' -> Right (distance', state)
+              trip = getByExtractorFromArray tid' (\(Trip tid _ _) -> tid) (trips state')
+              in case trip of
+                Left e1 -> Left e1
+                Right foundTrip@(Trip _ _ stopOrPathList) ->
+                  let
+                    distance = tripDistanceData stopOrPathList
+                    in case distance of
+                      Left e2 -> Left e2
+                      Right distance' -> Right (distance', state')
     _ -> Left "Not a trip distance query"
 stopOrPathDistance :: StopOrPath -> StopOrPath -> Either String Float
 stopOrPathDistance sop1 sop2 =
@@ -1285,23 +1305,32 @@ joinTwoRoutes state query' =
   case query' of
     (JoinTwoRoutes route1 route2 newRouteId newName) ->
       let
-        newRoute = joinTwoRoutesData (routes state) (stops state) route1 route2 newRouteId newName
-        in case newRoute of
+        routeFromQuery = parseQueryRouteData route1 state
+        in case routeFromQuery of
           Left e1 -> Left e1
-          Right (route, stops') ->
+          Right (r1@(Route rid1 _ _), state') ->
             let
-              updateStops = updateOrAddStops stops' state
-              in case updateStops of
-                Left e2 -> Left e2
-                Right newState ->
+              routeFromQuery2 = parseQueryRouteData route2 state'
+              in case routeFromQuery2 of
+                Left e1 -> Left e1
+                Right (r2@(Route rid2 _ _), state'') ->
                   let
-                    addRoute' = addRoute route newState
-                    in case addRoute' of
-                      Left e3 -> Left e3
-                      Right finalState -> Right (route, finalState)
+                    newRoute = joinTwoRoutesData (routes state'') (stops state'') rid1 rid2 newRouteId newName
+                    in case newRoute of
+                      Left e1 -> Left e1
+                      Right (route, stops') ->
+                        let
+                          updateStops = updateOrAddStops stops' state''
+                          in case updateStops of
+                            Left e2 -> Left e2
+                            Right newState ->
+                              let
+                                addRoute' = addRoute route newState
+                                in case addRoute' of
+                                  Left e3 -> Left e3
+                                  Right finalState -> Right (route, finalState)
     _ -> Left "Not a join two routes query"
 joinTwoRoutesData :: [Route] ->  [Stop] -> RouteId -> RouteId -> RouteId -> Name -> Either String (Route, [Stop])
-joinTwoRoutesData _ _ _ _ _ _ = Left "empty input, cannot parse a join two routes"
 joinTwoRoutesData routes' stops' v1 v2 v3 v4 =
   let
     route1' = getByExtractorFromArray v1 (\(Route rid _ _) -> rid) routes'
@@ -1383,6 +1412,7 @@ joinTwoRoutesAtStop state query' =
                                 assignStop = assignStopsToRoute [get] newRouteId
                                 in case assignStop of
                                   Left e2 -> Left e2
+                                  Right [] -> Left "Stop not assigned to route"
                                   Right (foundStops:t) -> 
                                     let
                                       addStopToRoute = addStopIdToRoute sid route -- get the stop from the state  
@@ -1544,8 +1574,20 @@ parseQueryTripData query' state =
         in case createTrip' of
           Left e1 -> Left e1
           Right (trip, newState) -> Right (trip, newState)
-
-
+-- QUERY HELPERS
+parseQueryStopOrPathOrCreatListData :: [QueryStopOrPathOrCreate] -> State -> Either String ([StopOrPath], State)
+parseQueryStopOrPathOrCreatListData [] state = Right ([], state)
+parseQueryStopOrPathOrCreatListData (h:t) state =
+  let
+    parse = parseQueryStopOrPathOrCreateData h state
+    in case parse of
+      Left e1 -> Left e1
+      Right (stopOrPath, newState) ->
+        let
+          parse' = parseQueryStopOrPathOrCreatListData t newState
+          in case parse' of
+            Left e2 -> Left e2
+            Right (stopOrPathList, newState') -> Right (stopOrPath : stopOrPathList, newState')
 
 
 
@@ -1796,6 +1838,43 @@ pathInState path state = elementInArray path (paths state)
 -- Right contains an optional message to print and
 -- an updated program's state.
 stateTransition :: State -> Query -> Either String (Maybe String, State)
-stateTransition _ _ = Left "Not implemented 3"
-
-
+stateTransition state query =
+  case createStop state query of
+    Right (stop, state') -> Right (Just ("Stop " ++ (case stop of Stop _ name _ _ _ _ -> show name) ++ " created"), state')
+    Left e1 -> case (createRoute state query) of
+      Right (route, state') -> Right (Just ("Route " ++ (case route of Route _ name _ -> show name) ++ " created"), state')
+      Left e1 -> case (createTrip state query) of
+        Right (trip, state') -> Right (Just ("Trip " ++ (case trip of Trip _ name _ -> show name) ++ " created"), state')
+        Left e1 -> case (createPath state query) of
+          Right (path, state') -> Right (Just ("Path " ++ (case path of Path _ name _ _ _ -> show name) ++ " created"), state')
+          Left e1 ->  case (assignStopToRoute state query) of
+              Right (stop, state') -> Right (Just ("Stop " ++ (case stop of Stop _ name _ _ _ _ -> show name) ++ " assigned to route."), state')
+              Left e1 -> case (distanceBetweenStops state query) of
+                Right (distance, state') -> Right (Just ("Distance between stops is " ++ show distance), state')
+                Left e1 -> case (setNextStop state query) of
+                  Right (state') -> Right (Just ("Next stop set"), state')
+                  Left e1 -> case (setPreviousStop state query) of
+                    Right (state') -> Right (Just ("Previous stop set"), state')
+                    Left e1 -> case (findNextStop state query) of
+                      Right (stopId, state') -> Right (Just ("Next stop found: " ++ show stopId), state')
+                      Left e1 -> case (findPreviousStop state query) of
+                        Right (stopId, state') -> Right (Just ("Previous stop found: " ++ show stopId), state')
+                        Left e1 -> case (connectRouteStopsByMinDist state query) of
+                          Right (state') -> Right (Just ("Route stops connected by min distance"), state')
+                          Left e1 -> case (checkIfRouteStopsConnected state query) of
+                            Right (connected, state') -> Right (Just ("Route stops connected: " ++ show connected), state')
+                            Left e1 -> case (validateTrip state query) of
+                              Right (connected, state') -> Right (Just ("Trip stops connected: " ++ show connected), state')
+                              Left e1 -> case (cleanupTrip state query) of
+                                Right state' -> Right (Just ("Trip cleaned up"), state')
+                                Left e1 -> case (tripDistance state query) of
+                                  Right (distance, state') -> Right (Just ("Trip distance: " ++ show distance), state')
+                                  Left e1 -> case (joinTwoRoutes state query) of
+                                    Right (route, state') -> Right (Just ("Routes joined"), state')
+                                    Left e1 -> case (joinTwoTrips state query) of
+                                      Right (trip, state') -> Right (Just ("Trips joined"), state')
+                                      Left e1 -> case (joinTwoRoutesAtStop state query) of
+                                        Right (route, state') -> Right (Just ("Routes joined at stop"), state')
+                                        Left e1 -> Left "Invalid query"
+                              
+                            
