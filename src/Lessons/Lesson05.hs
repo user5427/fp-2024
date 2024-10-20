@@ -2,9 +2,6 @@
 module Lessons.Lesson05 () where
 
 import Lessons.Lesson04(Parser, parseNumber, and2', parseChar)
-import Text.Read (Lexeme(String))
-
-
 
 -- listOfNumbers := number (,number)*
 --                                  ^ many
@@ -34,9 +31,6 @@ parseManyAs = many (parseChar 'a')
 -- Right ([123],"")
 -- >>> parseListOfNumbers "123,123123,31232"
 -- Right ([123,123123,31232],"")
--- >>> parseListOfNumbers "123"
--- Right ([123],"")
-
 
 parseListOfNumbers :: Parser [Integer]
 parseListOfNumbers = and2' (:)

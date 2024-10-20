@@ -1,4 +1,3 @@
-
 name:                fp2024
 version:             0.1.0.0
 github:              "githubuser/fp2024"
@@ -36,6 +35,10 @@ ghc-options:
 
 library:
   source-dirs: src
+  dependencies:
+  - random
+  - stm
+  - async
 
 executables:
   fp2024-one:
