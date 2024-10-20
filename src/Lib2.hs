@@ -2,6 +2,8 @@
 {-# HLINT ignore "Redundant lambda" #-}
 module Lib2
     ( Query(..),
+    StopId(..), RouteId(..), PathId(..), Name(..), Point(..), QueryStopOrPath(..), QueryStopOrPathOrCreate(..), QueryStopOrCreatOrNextPrev(..),
+    CoordX(..), CoordY(..), PathLenght(..), TripId(..), QueryTrip(..), QueryRoute(..),
     parseQuery,
     State(..),
     emptyState,
@@ -735,7 +737,7 @@ parseQuery input =
                   `or2` parseQueryConnectRouteStopsByMinDistance `or2` parseQueryCheckIfRouteStopsConnected 
                     `or2` parseQueryDistanceBetweenStops `or2` parseQueryAssignStopToRoute) input
     in case res of
-      Left e1 -> Left e1
+      Left e1 -> Left "Unrecognized query format" -- e1
       Right (r1, v1) -> 
         if v1 == [] then Right r1
         else Left "Extra characters after the query"

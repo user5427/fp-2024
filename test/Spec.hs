@@ -22,16 +22,30 @@ unitTests = testGroup "Lib1 tests"
 
     -- Test parsing invalid input
     testCase "Parsing an invalid input returns error" $
-      Lib2.parseQuery "o" @?= Left "Unrecognized query format"
+      Lib2.parseQuery "o" @?= Left "Unrecognized query format",
 
+    -- Test parsing query with extra character after
+    testCase "Parsing a query with extra character after returns error" $
+      Lib2.parseQuery "create_stop(S1, PlsHelp, 0.55, 0.66)a" @?= Left "Extra characters after the query", 
 
-    -- Test parsing a valid CreateStop query
-    -- testCase "Parsing a valid CreateStop query" $
-    --   Lib2.parseQuery "createStop(S1 StopName (10.0, 20.0))" @?= 
-    --     Right (Lib2.CreateStop 1 "StopName" 10.0 20.0 0 0)
+    -- Test parsing a valid create_stop query
+    testCase "Parsing a valid create_stop query" $
+      Lib2.parseQuery "create_stop(S1, StopName, 10.0, 20.0)" @?= 
+        Right (Lib2.CreateStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))),
 
-    -- -- Test parsing a valid CreateRoute query
-    -- testCase "Parsing a valid CreateRoute query" $
-    --   Lib2.parseQuery "createRoute(R2 RouteName [1,2,3])" @?=
-    --     Right (Lib2.CreateRoute 2  [1, 2, 3])
+    -- Test parsing a valid create_route query
+    testCase "Parsing a valid create_route query" $
+      Lib2.parseQuery "create_route(R2, RouteName, S1, S2, S3)" @?= 
+        Right (Lib2.CreateRoute (Lib2.RouteId 'R' 2) (Lib2.Name "RouteName") [(Lib2.StopId 'S' 1), (Lib2.StopId 'S' 2), (Lib2.StopId 'S' 3)]),
+
+    -- Test parsing a valid create_trip query
+    testCase "Parsing a valid create_trip query" $
+      Lib2.parseQuery "create_trip(T1, R, S1)" @?=
+        Right (Lib2.CreateTrip (Lib2.TripId 'T' 1) (Lib2.Name "R")  [Lib2.QueryStopOrPath' (Lib2.StopId' (Lib2.StopId 'S' 1))]),
+
+    -- Test parsing a valid CreatePath query
+    testCase "Parsing a valid CreatePath query" $
+      Lib2.parseQuery "create_path(P1, path, 10.0, S1, S2)" @?=
+        Right (Lib2.CreatePath (Lib2.PathId 'P' 1) (Lib2.Name "path") (Lib2.PathLenght 10.0) (Lib2.StopId 'S' 1) (Lib2.StopId 'S' 2) )
+
   ]
