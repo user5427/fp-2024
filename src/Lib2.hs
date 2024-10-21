@@ -1254,13 +1254,13 @@ connectStopsByMinDistData (stop:rest) route' =
               Left e2 -> Left e2
               Right newStop' ->
                 let
-                  in if stop' == h then connectStopsByMinDist' newStop' closestStop' t (acc ++ [newStop'])
+                  in if stop' == prev' then connectStopsByMinDist' newStop' closestStop' t (acc ++ [newStop'])
                   else
                     let
                       newPrevStop = parseSetPreviousStopData newStop' route' prev'
                       in case newPrevStop of
                         Left e3 -> Left e3
-                        Right newPrevStop' -> connectStopsByMinDist' newPrevStop' closestStop' t (acc ++ [newStop'])
+                        Right newPrevStop' -> connectStopsByMinDist' newPrevStop' closestStop' t (acc ++ [newPrevStop'])
 -- <check_if_route_stops_connected> ::= "check_if_route_stops_connected(" <route_id> ")" -- atleast n-1 previous connections and n-1 next connections
 checkIfRouteStopsConnected :: State -> Query -> Either String (Bool, State)
 checkIfRouteStopsConnected state query' =
@@ -1272,7 +1272,7 @@ checkIfRouteStopsConnected state query' =
           Left e1 -> Left e1
           Right foundRouteStops ->
             let
-              connected = checkIfRouteStopsConnectedData foundRouteStops 0 0 routeId
+              connected = checkIfRouteStopsConnectedData foundRouteStops routeId
               in case connected of
                 Left e2 -> Left e2
                 Right (prevCount, nextCount) ->
@@ -1281,33 +1281,46 @@ checkIfRouteStopsConnected state query' =
                       then Right (True, state)
                       else Right (False, state)
     _ -> Left "Not a check if route stops connected query"
-checkIfRouteStopsConnectedData :: [Stop] -> Int -> Int -> RouteId -> Either String (Int, Int)
-checkIfRouteStopsConnectedData [] prevCount nextCount rid = Right (prevCount, nextCount)
-checkIfRouteStopsConnectedData [_] _ _ _ = Right (1, 1)
-checkIfRouteStopsConnectedData (h:t) prevCount nextCount rid =
-  let
-    Stop _ _ _ nextStop prevStops _ = h
+checkIfRouteStopsConnectedData :: [Stop] -> RouteId -> Either String (Int, Int)
+checkIfRouteStopsConnectedData [] rid = Right (0, 0)
+checkIfRouteStopsConnectedData [_] _ = Right (1, 1)
+checkIfRouteStopsConnectedData (h':t') rid' = checkConnection' (h':t') 0 0 rid' 0
+  where 
+    checkConnection' [] prevCount nextCount _ _ = Right (prevCount, nextCount)
+    checkConnection' (h:t) prevCount nextCount rid index =
+      let
+        Stop _ _ _ nextStop prevStops _ = h
 
-    routeId' = getByExtractorFromArray rid (\(NextStop _ rid') -> rid') nextStop
-    routeId'' = getByExtractorFromArray rid (\(PreviousStop _ rid') -> rid') prevStops
-    in case routeId' of
-      Left e1 -> Left e1
-      Right routeId1 ->
-        case routeId'' of
-          Left e2 -> Left e2
-          Right routeId2 ->
-            let
-              routeId1' = case routeId1 of (NextStop _ rid'') -> rid''
-              routeId2' = case routeId2 of (PreviousStop _ rid'') -> rid''
-              in if routeId1' == rid && routeId2' == rid
-                then checkIfRouteStopsConnectedData t (prevCount + 1) (nextCount + 1) rid
-                else
-                  if routeId1' == rid
-                    then checkIfRouteStopsConnectedData t prevCount (nextCount + 1) rid
+        routeId' = getByExtractorFromArray rid (\(NextStop _ rid') -> rid') nextStop
+        routeId'' = getByExtractorFromArray rid (\(PreviousStop _ rid') -> rid') prevStops
+        in case routeId' of
+          Left e1 -> 
+             case routeId'' of
+              Left e2 -> Left "Route stops are not connected"
+              Right routeId2 -> 
+                let in if index == nextCount
+                  then checkConnection' t (prevCount + 1) nextCount rid (index+1)
+                  else Left "Route stops are not connected"
+
+          Right routeId1 ->
+            case routeId'' of
+              Left e2 -> 
+                let in if index == 0
+                  then checkConnection' t prevCount (nextCount + 1) rid (index+1)
+                  else Left "Route stops are not connected"
+              Right routeId2 ->
+                let
+                  routeId1' = case routeId1 of (NextStop _ rid'') -> rid''
+                  routeId2' = case routeId2 of (PreviousStop _ rid'') -> rid''
+                  in if routeId1' == rid && routeId2' == rid
+                    then checkConnection' t (prevCount + 1) (nextCount + 1) rid (index+1)
                     else
-                      if routeId2' == rid
-                        then checkIfRouteStopsConnectedData t (prevCount + 1) nextCount rid
-                        else checkIfRouteStopsConnectedData t prevCount nextCount rid
+                      if routeId1' == rid
+                        then checkConnection' t prevCount (nextCount + 1) rid (index+1)
+                        else
+                          if routeId2' == rid
+                            then checkConnection' t (prevCount + 1) nextCount rid (index+1)
+                            else checkConnection' t prevCount nextCount rid (index+1)
 -- <validate_trip> ::= "validate_trip(" <trip> ")" -- all stops and paths are connected
 validateTrip :: State -> Query -> Either String (Bool, State)
 validateTrip state query' =
