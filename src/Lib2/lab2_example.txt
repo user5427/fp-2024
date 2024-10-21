@@ -92,3 +92,25 @@ Trip distance: 2.828427
 Trip cleaned up
 >>> trip_distance(T1)
 Trip distance: 2.828427
+>>> create_path(P1, path, 1.0, S1, S2)
+Path Name "path" created
+>>> create_trip(T2, trip, S1, S2, P1, S3)
+Trip Name "trip" created
+>>> validate_trip(T2)
+ERROR:Trip stops or paths are not connected
+>>> create_trip(T3, trip2, S1, P1, S2, S3)
+Trip Name "trip2" created
+>>> validate_trip(T3)
+Trip stops connected: True
+>>> trip_distance(T3)
+Trip distance: 2.4142137
+>> join_two_trips(T2, T3, T4, evenMore)
+Trips joined
+>>> validate_trip(T4)
+ERROR:Trip stops or paths are not connected
+>>> cleanup_trip(T4)
+Trip cleaned up
+>>> validate_trip(T4)
+Trip stops connected: True
+>>> trip_distance(T4)
+Trip distance: 0.0 -- probably failed to cleanup because the given trips did not connect ends
