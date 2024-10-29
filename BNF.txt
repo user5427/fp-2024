@@ -1,3 +1,6 @@
+<batch> ::= "BEGIN " <command_list> " END"
+<command_list> ::= <command> | <command> "; " <command_list>
+
 <command> ::= <create_stop> | <create_route> | <join_two_routes> | 
 <join_two_routes_at_stop> | <join_two_trips> | 
 <create_path> | <create_trip> |
