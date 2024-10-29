@@ -4,10 +4,12 @@ module Lib2
     ( Query(..),
     StopId(..), RouteId(..), PathId(..), Name(..), Point(..), QueryStopOrPath(..), QueryStopOrPathOrCreate(..), QueryStopOrCreatOrNextPrev(..),
     CoordX(..), CoordY(..), PathLenght(..), TripId(..), QueryTrip(..), QueryRoute(..),
+    Stop(..), Route(..), Path(..), Trip(..),
     parseQuery,
     State(..),
     emptyState,
-    stateTransition
+    stateTransition,
+    parseExact,
     ) where
 
 import qualified Data.Char as C
@@ -729,7 +731,7 @@ parseQueryJoinTwoRouterAtStop input =
 
 -- | Parses user's input.
 -- The function must have tests.
-parseQuery :: String -> Either String Query
+parseQuery :: String -> Either String (Query, String)
 parseQuery [] = Left "Empty input is not a valid query"
 parseQuery input =
   let
@@ -744,9 +746,8 @@ parseQuery input =
                     `or2` parseQueryDistanceBetweenStops `or2` parseQueryAssignStopToRoute) input
     in case res of
       Left e1 -> Left "Unrecognized query format" -- e1
-      Right (r1, v1) -> 
-        if v1 == [] then Right r1
-        else Left "Extra characters after the query"
+      Right (r1, v1) -> Right (r1, v1)
+        
 
 addStopIdToRoute :: StopId -> Route -> Either String Route
 addStopIdToRoute stopId route@(Route rid name stops) =
@@ -935,7 +936,7 @@ createRoute state query' =
                                         Right finalState -> Right (route, finalState)
     _ -> Left "Not a create route query"
 -- <create_trip> ::= "create_trip(" <trip_id> ", " <name> ", " <list_of_stops_paths_creat> ")"
-data Trip = Trip TripId Name [StopOrPath] deriving (Show, Eq)
+data Trip = Trip TripId Name [QueryStopOrPath] deriving (Show, Eq)
 createTrip :: State -> Query -> Either String (Trip, State)
 createTrip state query' =
   case query' of
@@ -951,7 +952,8 @@ createTrip state query' =
                 Left e994 -> Left e994
                 Right (stopsAndPaths, state'''') ->
                   let
-                    trip = Trip tripId name stopsAndPaths
+                    getStopOrPathIDs = manyToQueryStopOrPath stopsAndPaths
+                    trip = Trip tripId name getStopOrPathIDs
                     addTrip' = addTrip trip state''''
                     in case addTrip' of
                       Left e1 -> Left e1
@@ -1337,13 +1339,18 @@ validateTrip state query' =
                 Left e1 -> Left e1
                 Right foundTrip@(Trip _ _ stopOrPathList) ->
                   let
-                    connected = validateTripData stopOrPathList
-                    in case connected of
-                      Left e2 -> Left e2
-                      Right connected' ->
+                    stopOrPathEnt = getManyStopOrPath stopOrPathList state''
+                    in case stopOrPathEnt of
+                      Left e1 -> Left e1
+                      Right stopOrPathEnt' ->
                         let
-                          in if connected' then Right (True, state'')
-                          else Right (False, state'')
+                          connected = validateTripData stopOrPathEnt'
+                          in case connected of
+                            Left e2 -> Left e2
+                            Right connected' ->
+                              let
+                                in if connected' then Right (True, state'')
+                                else Right (False, state'')
     _ -> Left "Not a validate trip query"
 validateTripData :: [StopOrPath] -> Either String Bool
 validateTripData [] = Right True
@@ -1408,15 +1415,21 @@ cleanupTrip state query' =
                 Left e1 -> Left e1
                 Right foundTrip@(Trip _ _ stopOrPathList) -> -- stopOrPathList FIXME not same type
                   let
-                    cleaned = cleanupTripData stopOrPathList
-                    in case cleaned of
-                      Left e2 -> Left e2
-                      Right cleaned' ->
+                    stopOrPathEnt = getManyStopOrPath stopOrPathList state''''
+                    in case stopOrPathEnt of
+                      Left e1 -> Left e1
+                      Right stopOrPathEnt' ->
                         let
-                          updatedTrip = Trip tid' (case foundTrip of Trip _ name _ -> name) cleaned'
-                          in case updateTrip updatedTrip state'''' of
-                            Left e3 -> Left e3
-                            Right newState -> Right newState
+                          cleaned = cleanupTripData stopOrPathEnt'
+                          in case cleaned of
+                            Left e2 -> Left e2
+                            Right cleaned' ->
+                              let
+                                newStopsAndPaths = manyToQueryStopOrPath cleaned'
+                                updatedTrip = Trip tid' (case foundTrip of Trip _ name _ -> name) newStopsAndPaths
+                                in case updateTrip updatedTrip state'''' of
+                                  Left e3 -> Left e3
+                                  Right newState -> Right newState
     _ -> Left "Not a cleanup trip query"
 -- basically add one element and check if it is valid, if yes continue adding if no, then just return the valid part
 cleanupTripData :: [StopOrPath] -> Either String [StopOrPath]
@@ -1448,10 +1461,15 @@ tripDistance state query' =
                 Left e1 -> Left e1
                 Right foundTrip@(Trip _ _ stopOrPathList) ->
                   let
-                    distance = tripDistanceData stopOrPathList
-                    in case distance of
-                      Left e2 -> Left e2
-                      Right distance' -> Right (distance', state')
+                    stopOrPathEntList = getManyStopOrPath stopOrPathList state'
+                    in case stopOrPathEntList of 
+                      Left e3 -> Left e3
+                      Right stopOrPathEntList' ->
+                        let
+                          distance = tripDistanceData stopOrPathEntList'
+                          in case distance of
+                            Left e2 -> Left e2
+                            Right distance' -> Right (distance', state')
     _ -> Left "Not a trip distance query"
 stopOrPathDistance :: StopOrPath -> StopOrPath -> Either String Float
 stopOrPathDistance sop1 sop2 =
@@ -2030,6 +2048,51 @@ deletePath targetId state =
 pathInState :: Path -> State -> Bool
 pathInState path state = elementInArray path (paths state)
 
+
+
+-- get stopOrPath from QueryStopOrPath
+getStopOrPath :: QueryStopOrPath -> State -> Either String StopOrPath
+getStopOrPath query' state =
+  case query' of
+    (StopId' stopId) ->
+      let
+        stop = getStop stopId state
+        in case stop of
+          Left e1 -> Left e1
+          Right foundStop -> Right (Stop' foundStop)
+    (PathId' pathId) ->
+      let
+        path = getPath pathId state
+        in case path of
+          Left e1 -> Left e1
+          Right foundPath -> Right (Path' foundPath)
+    _ -> Left "Not a stop or path query"
+
+getManyStopOrPath :: [QueryStopOrPath] -> State -> Either String [StopOrPath]
+getManyStopOrPath [] state = Right []
+getManyStopOrPath (h:t) state =
+  let
+    stopOrPath = getStopOrPath h state
+    in case stopOrPath of
+      Left e1 -> Left e1
+      Right foundStopOrPath ->
+        let
+          stopOrPathList = getManyStopOrPath t state
+          in case stopOrPathList of
+            Left e2 -> Left e2
+            Right foundStopOrPathList -> Right (foundStopOrPath : foundStopOrPathList)
+
+toQueryStopOrPath :: StopOrPath -> QueryStopOrPath
+toQueryStopOrPath stopOrPath =
+  case stopOrPath of
+    Stop' (Stop sid _ _ _ _ _) -> StopId' sid
+    Path' (Path pid _ _ _ _) -> PathId' pid
+
+manyToQueryStopOrPath :: [StopOrPath] -> [QueryStopOrPath]
+manyToQueryStopOrPath [] = []
+manyToQueryStopOrPath (h:t) = (toQueryStopOrPath h) : (manyToQueryStopOrPath t)
+
+
 combineMessages :: Maybe String -> Maybe String -> Maybe String
 combineMessages Nothing msg = msg
 combineMessages msg Nothing = msg
@@ -2047,7 +2110,7 @@ multiQuery prevQuer stringInp =
           Left e1 -> Left e1
           Right query' -> 
             let
-              newQuer = stateTransition state' query'
+              newQuer = stateTransition state' (fst query')
               in case newQuer of
                 Left e2 -> Left e2
                 Right (msg2, state'') -> Right (msg2, state'')
@@ -2065,7 +2128,7 @@ stateWithQuery state input =
     in
       case query of
         Left e1 -> Left e1
-        Right query' -> stateTransition state query'
+        Right query' -> stateTransition state (fst query')
 
 getQuery :: Either String Query -> Either String Query
 getQuery input =

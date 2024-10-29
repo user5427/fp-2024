@@ -152,11 +152,8 @@ createAllTrips state =
     tripCreatingCommand' [] acc = acc
     tripCreatingCommand' (trip@(Lib2.Trip id name stopOrPathie):xs) acc = 
       let
-        mappAGAIN = map (\id -> case id of 
-                                Lib2.Stop' sCha sId -> Lib2.StopId' (Lib2.StopId sCha sId)
-                                Lib2.Path' pCha pId -> Lib2.PathId' (Lib2.PathId pCha pId)) stopOrPathie
-        transform = map (\id -> Lib2.QueryStopOrPath' id) mappAGAIN
-        tr = Lib2.CreateTrip id name (transform)
+        transform = map (\id -> Lib2.QueryStopOrPath' id) stopOrPathie
+        tr = Lib2.CreateTrip id name transform
         in tripCreatingCommand' xs (acc ++ [tr])
 
 -- | Renders Statements into a String which
