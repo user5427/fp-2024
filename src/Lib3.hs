@@ -12,6 +12,7 @@ module Lib3
 import Control.Concurrent ( Chan )
 import Control.Concurrent.STM(STM, TVar)
 import qualified Lib2
+import Lib2 (Query)
 
 data StorageOp = Save String (Chan ()) | Load (Chan String)
 -- | This function is started from main
@@ -98,28 +99,36 @@ closingEND input =
 -- | Converts program's state into Statements
 -- (probably a batch, but might be a single query)
 marshallState :: Lib2.State -> Statements
-marshallState _ = error "Not implemented 4"
+marshallState states =
+  let
+    stops = createAllStops states
+    routes = createAllRoutes states
+    paths = createAllPaths states
+    trips = createAllTrips states
+    connestions = createAllConnections states
+    in Batch (stops ++ routes ++ paths ++ trips ++ connestions)
 
 
 
-createAllStops :: Lib2.State -> Statements
+
+createAllStops :: Lib2.State -> [Query]
 createAllStops state = 
   let
     stopCreatingCommand = stopCreatingCommand' (Lib2.stops state) [] -- "create_stop(S1, PlsHelp, 0.55, 0.66)"
-    in Batch stopCreatingCommand
+    in stopCreatingCommand
 
   where 
     stopCreatingCommand' [] acc = acc
-    stopCreatingCommand' (stop@(Lib2.Stop id name point [] [] []):xs) acc = 
+    stopCreatingCommand' (stop@(Lib2.Stop id name point _ _ _):xs) acc = 
       let 
         st = Lib2.CreateStop id name point
         in stopCreatingCommand' xs (acc ++ [st])
         
-createAllRoutes :: Lib2.State -> Statements -- "create_route(R1, imabouttodiefromhaskell, S1, S2, S3)"
+createAllRoutes :: Lib2.State -> [Query] -- "create_route(R1, imabouttodiefromhaskell, S1, S2, S3)"
 createAllRoutes state = 
   let
     routeCreatingCommand = routeCreatingCommand' (Lib2.routes state) []
-    in Batch routeCreatingCommand
+    in routeCreatingCommand
 
   where
     routeCreatingCommand' [] acc = acc
@@ -129,11 +138,11 @@ createAllRoutes state =
         rt = Lib2.CreateRoute id name (transform)
         in routeCreatingCommand' xs (acc ++ [rt])
 
-createAllPaths :: Lib2.State -> Statements -- "create_path(P1, path, 1.0, S1, S2)"
+createAllPaths :: Lib2.State -> [Query] -- "create_path(P1, path, 1.0, S1, S2)"
 createAllPaths state = 
   let
     pathCreatingCommand = pathCreatingCommand' (Lib2.paths state) []
-    in Batch pathCreatingCommand
+    in pathCreatingCommand
 
   where
     pathCreatingCommand' [] acc = acc
@@ -142,11 +151,11 @@ createAllPaths state =
         pt = Lib2.CreatePath id name length stop1 stop2
         in pathCreatingCommand' xs (acc ++ [pt])
 
-createAllTrips :: Lib2.State -> Statements -- "create_trip(T1, trip, S1, S2, P1, S3)" S1 S2 P1 S3 - list of StopOrPath
+createAllTrips :: Lib2.State -> [Query] -- "create_trip(T1, trip, S1, S2, P1, S3)" S1 S2 P1 S3 - list of StopOrPath
 createAllTrips state = 
   let
     tripCreatingCommand = tripCreatingCommand' (Lib2.trips state) []
-    in Batch tripCreatingCommand
+    in tripCreatingCommand
 
   where
     tripCreatingCommand' [] acc = acc
@@ -156,6 +165,21 @@ createAllTrips state =
         tr = Lib2.CreateTrip id name transform
         in tripCreatingCommand' xs (acc ++ [tr])
 
+createAllConnections :: Lib2.State -> [Query] -- "set_next_stop(S1, R1, S2)" "set_previous_stop(S1, R1, S2)" SetNextStop SetPreviousStop
+createAllConnections state = 
+  let
+    stops = Lib2.stops state -- data Stop = Stop StopId Name Point [NextStop] [PreviousStop] [RouteId] deriving (Show, Eq)
+    generateConnection = generateConnection' stops []
+    in generateConnection
+
+    where
+      generateConnection' [] acc = acc
+      generateConnection' (stop@(Lib2.Stop id name point nextStops previousStops routes):xs) acc = 
+        let
+          nextStop = map (\(Lib2.NextStop stopId routeId) -> Lib2.SetNextStop id routeId stopId) nextStops
+          previousStop = map (\(Lib2.PreviousStop stopId routeId) -> Lib2.SetPreviousStop id routeId stopId) previousStops
+          in generateConnection' xs (acc ++ nextStop ++ previousStop)
+
 -- | Renders Statements into a String which
 -- can be parsed back into Statements by parseStatements
 -- function. The String returned by this function must be used
@@ -163,7 +187,35 @@ createAllTrips state =
 -- Must have a property test
 -- for all s: parseStatements (renderStatements s) == Right(s, "")
 renderStatements :: Statements -> String
-renderStatements _ = error "Not implemented 5"
+renderStatements batch = 
+  let
+    startCommand = "BEGIN "
+    generatedCommands = loopOverCommands batch []
+    endCommand = " END"
+    in startCommand ++ show generatedCommands ++ endCommand
+
+  where
+    loopOverCommands (Batch []) acc = acc
+    loopOverCommands (Batch (x:xs)) acc = loopOverCommands (Batch xs) (acc ++ [loopOverQuery x])
+    loopOverCommands (Single x) acc = acc ++ [loopOverQuery x]
+
+    loopOverQuery (Lib2.CreateStop id name point@(Lib2.Point x y)) = "create_stop(" ++ show id ++ ", " ++ show name ++ ", " ++ show x ++ ", " ++ show y ++ ")"
+    loopOverQuery (Lib2.CreateRoute id name stops) = "create_route(" ++ show id ++ ", " ++ show name ++ ", " ++ loopOverStops stops ++ ")"
+    loopOverQuery (Lib2.CreatePath id name length stop1 stop2) = "create_path(" ++ show id ++ ", " ++ show name ++ ", " ++ show length ++ ", " ++ show stop1 ++ ", " ++ show stop2 ++ ")"
+    loopOverQuery (Lib2.CreateTrip id name stopOrPathie) = "create_trip(" ++ show id ++ ", " ++ show name ++ ", " ++ loopOverStopOrPath stopOrPathie ++ ")"
+    loopOverQuery (Lib2.SetNextStop stopId routeId nextStopId) = "set_next_stop(" ++ show stopId ++ ", " ++ show routeId ++ ", " ++ show nextStopId ++ ")"
+    loopOverQuery (Lib2.SetPreviousStop stopId routeId previousStopId) = "set_previous_stop(" ++ show stopId ++ ", " ++ show routeId ++ ", " ++ show previousStopId ++ ")"
+    loopOverQuery _ = error "Error in loopOverQuery"
+
+loopOverStops :: [Lib2.QueryStopOrCreatOrNextPrev] -> String
+loopOverStops [] = ""
+loopOverStops [x] = show x
+loopOverStops (x:xs) = show x ++ ", " ++ loopOverStops xs
+
+loopOverStopOrPath :: [Lib2.QueryStopOrPathOrCreate] -> String
+loopOverStopOrPath [] = ""
+loopOverStopOrPath [x] = show x
+loopOverStopOrPath (x:xs) = show x ++ ", " ++ loopOverStopOrPath xs
 
 -- | Updates a state according to a command.
 -- Performs file IO via ioChan if needed.

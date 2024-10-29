@@ -4,7 +4,7 @@ module Lib2
     ( Query(..),
     StopId(..), RouteId(..), PathId(..), Name(..), Point(..), QueryStopOrPath(..), QueryStopOrPathOrCreate(..), QueryStopOrCreatOrNextPrev(..),
     CoordX(..), CoordY(..), PathLenght(..), TripId(..), QueryTrip(..), QueryRoute(..),
-    Stop(..), Route(..), Path(..), Trip(..),
+    Stop(..), Route(..), Path(..), Trip(..), NextStop(..), PreviousStop(..),
     parseQuery,
     State(..),
     emptyState,
