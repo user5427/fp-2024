@@ -9,10 +9,56 @@ module Lib3
     renderStatements
     ) where
 
-import Control.Concurrent ( Chan )
+import Control.Concurrent ( Chan, readChan, writeChan )
 import Control.Concurrent.STM(STM, TVar)
 import qualified Lib2
 import Lib2 (Query)
+import Control.Applicative
+import Control.Concurrent.STM.TVar
+import GHC.Conc.Sync
+import Control.Concurrent.Chan
+
+data Parser a = Parser { -- like data State...
+    runParser :: String -> Either String (a, String)
+}
+
+instance Functor Parser where
+    fmap :: (a -> b) -> Parser a -> Parser b
+    fmap f functor = Parser $ \input ->
+        case runParser functor input of -- like stops State 
+            Left e -> Left e
+            Right (v, r) -> Right (f v, r)
+
+instance Applicative Parser where
+    pure :: a -> Parser a
+    pure a = Parser $ \input -> Right (a, input)
+    (<*>) :: Parser (a -> b) -> Parser a -> Parser b
+    ff <*> fa = Parser $ \input ->
+        case runParser ff input of
+            Left e1 -> Left e1
+            Right (f, r1) -> case runParser fa r1 of
+                                Left e2 -> Left e2
+                                Right (a, r2) -> Right (f a , r2)
+
+instance Monad Parser where
+    (>>=) :: Parser a -> (a -> Parser b) -> Parser b
+    ma >>= mf = Parser $ \input ->
+        case runParser ma input of
+            Left e1 -> Left e1
+            Right (a, r1) -> case runParser (mf a) r1 of
+                                Left e2 -> Left e2
+                                Right (b, r2) -> Right (b, r2)
+
+instance Alternative Parser where
+    empty :: Parser a
+    empty = Parser $ \input -> Left $ "Could not parse " ++ input
+    (<|>) :: Parser a -> Parser a -> Parser a
+    p1 <|> p2 = Parser $ \inp ->
+        case (runParser p1 inp) of
+            Right r1 -> Right r1
+            Left e1 -> case (runParser p2 inp) of
+                            Right r2 -> Right r2
+                            Left e2 -> Left $ "Failed twise: " ++ e1 ++ " AND " ++ e2
 
 data StorageOp = Save String (Chan ()) | Load (Chan String)
 -- | This function is started from main
@@ -22,9 +68,16 @@ data StorageOp = Save String (Chan ()) | Load (Chan String)
 -- to a channel provided in a request.
 -- Modify as needed.
 storageOpLoop :: Chan StorageOp -> IO ()
-storageOpLoop _ = do
-
-  
+storageOpLoop chan = do
+  op <- readChan chan
+  case op of
+    Save dataString dataChan -> do
+      writeFile "state.txt" dataString
+      writeChan dataChan ()
+    Load dataChan -> do
+      dataString <- readFile "state.txt"
+      writeChan dataChan dataString
+  storageOpLoop chan
   return ()
 
 data Statements = Batch [Lib2.Query] |
@@ -229,4 +282,62 @@ loopOverStopOrPath (x:xs) = show x ++ ", " ++ loopOverStopOrPath xs
 -- is stored in transactinal variable
 stateTransition :: TVar Lib2.State -> Command -> Chan StorageOp ->
                    IO (Either String (Maybe String))
-stateTransition _ _ ioChan = return $ Left "Not implemented 6"
+stateTransition stateVar cmd ioChan = case cmd of
+  LoadCommand -> do
+    ackChan <- newChan
+    writeChan ioChan (Load ackChan)
+    loadedData <- readChan ackChan
+    case parseStatements loadedData of
+      Left e2 -> return $ Left ("Load failed: " ++ e2 ++ ". \nData: " ++ loadedData)
+      Right (v, a2) -> let
+        lengt = length a2
+        in case lengt of
+          0 -> case applyStatementsToState v (Lib2.emptyState) of 
+                Left e -> return $ Left ("Load failed: " ++ e)
+                Right (m, s) -> atomically $ do
+                  writeTVar stateVar s
+                  return $ Right (Just "Loaded")
+          _ -> return $ Left ("Not parsed fully: " ++ a2 ++ ". \nData: " ++ loadedData)
+        
+
+  SaveCommand -> do
+    currentState <- readTVarIO stateVar
+    let statements = marshallState currentState
+    let serializedState = renderStatements statements
+    ackChan <- newChan
+    writeChan ioChan (Save serializedState ackChan)
+    _ <- readChan ackChan  -- Wait for confirmation from storageOpLoop
+    return $ Right (Just "Saved")
+
+  StatementCommand statements -> do
+    currentState <- readTVarIO stateVar
+    case applyStatementsToState statements currentState of
+      Left e -> return $ Left e
+      Right (m, s) -> atomically $ do
+        writeTVar stateVar s
+        return $ Right m
+
+    
+
+applyStatementsToState :: Statements -> Lib2.State -> Either String (Maybe String, Lib2.State)
+applyStatementsToState statements state = applyStatementsToState' statements state [] 0
+  where
+    applyStatementsToState' (Single st) state' _ _ = 
+      case Lib2.stateTransition state' st of
+        Left e -> Left e
+        Right (m, s) -> 
+          case m of 
+            Just message -> Right (Just message, s)
+            Nothing -> Right (Nothing, s)
+            
+    applyStatementsToState' (Batch []) state' messages _ = 
+      let finalMessage = if null messages then Nothing else Just (unlines messages)
+      in Right (finalMessage, state')
+
+    applyStatementsToState' (Batch (x:xs)) state' messages depth = 
+      case Lib2.stateTransition state' x of
+        Left e -> Left e
+        Right (m, s) -> 
+          case m of 
+            Just message -> applyStatementsToState' (Batch xs) s (messages ++ ["[" ++ show depth ++ "] " ++ message]) (depth + 1)
+            Nothing -> applyStatementsToState' (Batch xs) s (messages ++ ["[" ++ show depth ++ "]"]) (depth + 1)

@@ -14,7 +14,7 @@ data Student = Student {
     age :: Int
 }
 
-data Parser a = Parser {
+data Parser a = Parser { -- like data State...
     runParser :: String -> Either String (a, String)
 }
 
@@ -28,6 +28,14 @@ parseDigit = Parser $ \input ->
         [] -> Left "Cannot find any digits in an empty input"
         s@(h:t) -> if C.isDigit h then Right (h, t) else Left (s ++ " does not start with a digit")
 
+parseDigit'' :: Parser Char
+parseDigit'' = Parser { 
+    runParser = \input ->
+    case input of
+        [] -> Left "Cannot find any digits in an empty input"
+        s@(h:t) -> if C.isDigit h then Right (h, t) else Left (s ++ " does not start with a digit")
+        }
+
 
 -- >>> runParser (fmap (\a -> [a,a]) parseDigit) "123" 
 -- Right ("11","23")
@@ -36,7 +44,7 @@ parseDigit = Parser $ \input ->
 instance Functor Parser where
     fmap :: (a -> b) -> Parser a -> Parser b
     fmap f functor = Parser $ \input ->
-        case runParser functor input of
+        case runParser functor input of -- like stops State 
             Left e -> Left e
             Right (v, r) -> Right (f v, r)
 

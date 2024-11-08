@@ -11,7 +11,6 @@ import Control.Monad (when)
 import Control.Concurrent.STM (newTVarIO)
 import Control.Concurrent.STM (modifyTVar)
 
-
 action :: String -> IO ()
 action name = do
     i <- randomIO :: IO Int
