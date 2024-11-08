@@ -252,23 +252,47 @@ renderStatements batch =
     loopOverCommands (Batch (x:xs)) acc = loopOverCommands (Batch xs) (acc ++ [loopOverQuery x])
     loopOverCommands (Single x) acc = acc ++ [loopOverQuery x]
 
-    loopOverQuery (Lib2.CreateStop id name point@(Lib2.Point x y)) = "create_stop(" ++ show id ++ ", " ++ show name ++ ", " ++ show x ++ ", " ++ show y ++ ")"
-    loopOverQuery (Lib2.CreateRoute id name stops) = "create_route(" ++ show id ++ ", " ++ show name ++ ", " ++ loopOverStops stops ++ ")"
-    loopOverQuery (Lib2.CreatePath id name length stop1 stop2) = "create_path(" ++ show id ++ ", " ++ show name ++ ", " ++ show length ++ ", " ++ show stop1 ++ ", " ++ show stop2 ++ ")"
-    loopOverQuery (Lib2.CreateTrip id name stopOrPathie) = "create_trip(" ++ show id ++ ", " ++ show name ++ ", " ++ loopOverStopOrPath stopOrPathie ++ ")"
-    loopOverQuery (Lib2.SetNextStop stopId routeId nextStopId) = "set_next_stop(" ++ show stopId ++ ", " ++ show routeId ++ ", " ++ show nextStopId ++ ")"
-    loopOverQuery (Lib2.SetPreviousStop stopId routeId previousStopId) = "set_previous_stop(" ++ show stopId ++ ", " ++ show routeId ++ ", " ++ show previousStopId ++ ")"
+    loopOverQuery (Lib2.CreateStop a@(Lib2.StopId cid id) n@(Lib2.Name name) point@(Lib2.Point x@(Lib2.CoordX xp) y@(Lib2.CoordY yp))) = "create_stop(" ++ show cid ++ show id ++ ", " ++ show name ++ ", " ++ show xp ++ ", " ++ show yp ++ ")"
+    loopOverQuery (Lib2.CreateRoute a@(Lib2.RouteId cid id) n@(Lib2.Name name) stops) = ---"create_route(" ++ show cid ++ show id ++ ", " ++ show name ++ ", " ++ loopOverStops stops ++ ")"
+      let
+        stopsOnly = map (\stop -> case stop of
+                                    Lib2.QueryStopOrCreatOrNextPrevStop cid -> cid
+                                    Lib2.QueryStopOrCreatOrNextPrevCreateStop _ -> error "Unexpected CreateStop"
+                                    Lib2.QueryStopOrCreatOrNextPrevFindNextStop _ -> error "Unexpected FindNextStop"
+                                    Lib2.QueryStopOrCreatOrNextPrevFindPreviousStop _ -> error "Unexpected FindPreviousStop") stops
+        manyStops = parseManyStops' stopsOnly []
+        in "create_route(" ++ show cid ++ show id ++ ", " ++ show name ++ manyStops ++ ")"
+
+      where 
+        parseManyStops' [] acc = acc
+        parseManyStops' [a@(Lib2.StopId cid id)] acc = acc ++ ", " ++ show cid ++ show id
+        parseManyStops' (a@(Lib2.StopId cid id):xs) acc = parseManyStops' xs (acc ++ ", " ++ show cid ++ show id)
+
+    loopOverQuery (Lib2.CreatePath a@(Lib2.PathId cid id) n@(Lib2.Name name) p@(Lib2.PathLenght length''') b@(Lib2.StopId cid' id') c@(Lib2.StopId cid'' id'')) = "create_path(" ++ show cid ++ show id ++ ", " ++ show name ++ ", " ++ show length''' ++ ", " ++ show cid' ++ show id' ++ ", " ++ show cid'' ++ show id'' ++ ")"
+    loopOverQuery (Lib2.CreateTrip a@(Lib2.TripId cid id) n@(Lib2.Name name) stopOrPathie) = --"create_trip(" ++ show cid ++ show id ++ ", " ++ show name ++ ", " ++ loopOverStopOrPath stopOrPathie ++ ")"
+      let
+        stopOrPath = map (\stop -> case stop of
+                                    Lib2.QueryStopOrPath' cid -> cid
+                                    _ -> error "Unexpected stopOrPathie") stopOrPathie
+
+        stringStopOrPath = parseStopOrPath stopOrPath []
+
+
+        in "create_trip(" ++ show cid ++ show id ++ ", " ++ show name ++ stringStopOrPath ++ ")"
+
+        where
+          parseStopOrPath [] acc = acc
+          parseStopOrPath [Lib2.StopId' a@(Lib2.StopId cid id)] acc = acc ++ ", " ++ show cid ++ show id
+          parseStopOrPath (Lib2.StopId' a@(Lib2.StopId cid id):xs) acc = parseStopOrPath xs (acc ++ ", " ++ show cid ++ show id)
+          parseStopOrPath [Lib2.PathId' a@(Lib2.PathId cid id)] acc = acc ++ ", " ++ show cid ++ show id
+          parseStopOrPath (Lib2.PathId' a@(Lib2.PathId cid id):xs) acc = parseStopOrPath xs (acc ++ ", " ++ show cid ++ show id)
+
+     
+    loopOverQuery (Lib2.SetNextStop a@(Lib2.StopId cid id) c@(Lib2.RouteId cid'' id'') b@(Lib2.StopId cid' id')) = "set_next_stop(" ++ show cid ++ show id ++ ", " ++ show cid'' ++ show id'' ++ ", " ++ show cid' ++ show id' ++ ")"
+    loopOverQuery (Lib2.SetPreviousStop a@(Lib2.StopId cid id) c@(Lib2.RouteId cid'' id'') b@(Lib2.StopId cid' id')) = "set_previous_stop(" ++ show cid ++ show id ++ ", " ++ show cid'' ++ show id'' ++ ", " ++ show cid' ++ show id' ++ ")"
     loopOverQuery _ = error "Error in loopOverQuery"
 
-loopOverStops :: [Lib2.QueryStopOrCreatOrNextPrev] -> String
-loopOverStops [] = ""
-loopOverStops [x] = show x
-loopOverStops (x:xs) = show x ++ ", " ++ loopOverStops xs
 
-loopOverStopOrPath :: [Lib2.QueryStopOrPathOrCreate] -> String
-loopOverStopOrPath [] = ""
-loopOverStopOrPath [x] = show x
-loopOverStopOrPath (x:xs) = show x ++ ", " ++ loopOverStopOrPath xs
 
 -- | Updates a state according to a command.
 -- Performs file IO via ioChan if needed.
