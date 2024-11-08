@@ -65,6 +65,8 @@ mm''' = do
 
 -- >>> ml == map (\a -> a + 1) [1,2,3]
 -- True
+-- >>> show ml
+-- "[2,3,4]"
 ml :: [Integer]
 ml = do
     a <- [1,2,3]
@@ -107,6 +109,8 @@ em''' = do
 
 -- >>> c == (Just 1 >>= (\z -> return (z + 1)) >>= (\x -> return (x, 'a')))
 -- True
+-- >>> c
+-- Just (2,'a')
 c :: Maybe (Int, Char)
 c = do
     z <- Just 1

@@ -1,0 +1,1 @@
+https://blog.oliverbalfour.com/haskell/2020/08/06/applicative-functors.html
