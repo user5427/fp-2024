@@ -1,0 +1,13 @@
+BEGIN
+create_stop(S1, Seskine, 0.55, 0.66);
+create_stop(S2, Gelvoneliu, 1.55, 1.66);
+create_stop(S3, Gelvonu, 2.55, 2.66);
+create_stop(S4, Jovaro, 3.55, 3.66);
+create_route(R1, imabouttodiefromhaskell, S1, S2, S3, S4);
+set_next_stop(S1, R1, S2);
+set_next_stop(S2, R1, S3);
+set_previous_stop(S2, R1, S1);
+set_next_stop(S3, R1, S4);
+set_previous_stop(S3, R1, S2);
+set_previous_stop(S4, R1, S3);
+END

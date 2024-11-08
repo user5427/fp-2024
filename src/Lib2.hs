@@ -1441,7 +1441,7 @@ cleanupTripData input = cleanUpTripData input []
     cleanUpTripData [stopOrPath] acc = Right (acc ++ [stopOrPath])
     cleanUpTripData s@(h:t) acc =
       let
-        connected = validateTripData s
+        connected = validateTripData acc
         in case connected of
           Left e1 -> Right acc
           Right _ -> cleanUpTripData t (acc ++ [h])

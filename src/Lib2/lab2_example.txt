@@ -114,3 +114,5 @@ Trip cleaned up
 Trip stops connected: True
 >>> trip_distance(T4)
 Trip distance: 0.0 -- probably failed to cleanup because the given trips did not connect ends
+>>> create_stop(S5, PLSWORK, 0.585, 0.866); create_stop(S6, stoppp, 0.5585, 0.76)
+

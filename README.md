@@ -1,31 +1,62 @@
+
 # fp-2024
 
-## Setup
-
-### To get started, you first need to open the project using Visual Studio Code and having Docker Desktop
-1. `Ctrl + Shift + P`
-2. `Dev Containers: Open Folder in Container`
-
-### To Build & Test the Project, run the following commands
-1. `stack build`
-2. `stack test`
-
-## Domain - Public transport and routes
-
 [lab1](lab1.md)
+[lab2](lab2.md)
+
+## lab Three
+
+### grouping queries
+BNF Grouping queries syntax: ```<batch> ::= "BEGIN " <command_list> " END"```
+Examples
+  * ```
+    BEGIN create_stop(S1, Seskine, 0.55, 0.66); create_stop(S2, Gelvoneliu, 1.55, 1.66); END
+
+    [0] Stop Name "Seskine" created
+
+    [1] Stop Name "Gelvoneliu" created```
+  * ```
+    BEGIN create_route(R1, imabouttodiefromhaskell, S1, S2, S3, S4); connect_route_stops_by_min_dist(R1); END
+
+    [0] Route Name "imabouttodiefromhaskell" created
+
+    [1] Route stops connected by min distance
+    ```
+
+### :paste
+```
+-- Entering multi-line mode. Press <Ctrl-D> to finish.
+| BEGIN
+| create_stop(S1, Seskine, 0.55, 0.66);
+| create_stop(S2, Gelvoneliu, 1.55, 1.66);
+| create_stop(S3, Gelvonu, 2.55, 2.66);
+| create_stop(S4, Jovaro, 3.55, 3.66);
+| END
+| 
+[0] Stop Name "Seskine" created
+[1] Stop Name "Gelvoneliu" created
+[2] Stop Name "Gelvonu" created
+[3] Stop Name "Jovaro" created
+```
+
+### SAVE
+state.txt
+```
+BEGIN create_stop(S1, Seskine, 0.55, 0.66); 
+create_stop(S2, Gelvoneliu, 1.55, 1.66); 
+create_stop(S3, Gelvonu, 2.55, 2.66); 
+create_stop(S4, Jovaro, 3.55, 3.66); 
+create_route(R1, imabouttodiefromhaskell, S1, S2, S3, S4); 
+set_next_stop(S1, R1, S2); 
+set_next_stop(S2, R1, S3); 
+set_previous_stop(S2, R1, S1); 
+set_next_stop(S3, R1, S4); 
+set_previous_stop(S3, R1, S2); 
+set_previous_stop(S4, R1, S3); 
+END
+```
 
 
-### Lab Two
 
-BNF file changes:
-*  cleanup_trip, validate_trip, find_next_stop, find_previous_stop functions require less arguments or different arguments now.
-*  added set_next_stop and set_previous_stop functions because one stop can have multiple routes with different next or previous stops.
-* removed `<neg>` and replaced it with just `"-" <pos>` inside the `<float>` 
-* removed `<trip_name>` and `<route_name>`. Replaced with `<name>`. Reason: not needed.
-* ~~removed `<new_trip_id>` and `<new_route_id>` and replaced with `<trip_id>` and `<route_id>`. Reason: for better clarity.~~ Readded. Reason: for better clarity in BNF. Not recreated in `Lib2.hs`
-* added `<point>` which includes `<coord_x>` and `<coord_y>`
-* `<next_stop_id> ::= <stop_id>`, `<previous_stop_id> ::= <stop_id>` before stop_id it was integer
-* added func (for debug or other): assign_stop_to_route, distance_betweem_stops, connect_route_stops_by_min_dist, check_if_route_stops_connected
-* commands only found in BNF (only for clarity reasons) next_stop_id, previous_stop_id, new_name, new_trip_id, new_route_id
 
-[Examples of parsing commands, changing state](src/Lib2/lab2_example.txt)
+https://blog.oliverbalfour.com/haskell/2020/08/06/applicative-functors.html

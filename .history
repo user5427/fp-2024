@@ -1,0 +1,21 @@
+END
+create_stop(S4, Jovaro, 3.55, 3.66);
+create_stop(S3, Gelvonu, 2.55, 2.66);
+create_stop(S2, Gelvoneliu, 1.55, 1.66);
+create_stop(S1, Seskine, 0.55, 0.66);
+BEGIN
+:paste
+END
+create_stop(S4, Jovaro, 3.55, 3.66);
+create_stop(S3, Gelvonu, 2.55, 2.66);
+create_stop(S2, Gelvoneliu, 1.55, 1.66);
+create_stop(S1, Seskine, 0.55, 0.66);
+BEGIN
+:paste
+END
+create_stop(S4, Jovaro, 3.55, 3.66);
+create_stop(S3, Gelvonu, 2.55, 2.66);
+create_stop(S2, Gelvoneliu, 1.55, 1.66);
+create_stop(S1, Seskine, 0.55, 0.66);
+BEGIN
+:paste

@@ -94,48 +94,69 @@ parseCommand :: String -> Either String (Command, String)
 parseCommand input = 
   let
     parseIT = parseStatements input
-    in case parseIT of
-      Right (v1, r1) -> Right (StatementCommand v1, r1)
+    in case Lib2.parseExact "LOAD" input of
+      Right (_, r2) -> Right (LoadCommand, r2)
       Left _ -> 
-        case Lib2.parseExact "LOAD" input of
-          Right (_, r2) -> Right (LoadCommand, r2)
-          Left _ -> 
-            case Lib2.parseExact "SAVE" input of
-              Right (_, r3) -> Right (SaveCommand, r3)
-              Left e -> Left e
+        case Lib2.parseExact "SAVE" input of
+          Right (_, r3) -> Right (SaveCommand, r3)
+          Left _ -> case parseIT of
+            Right (v1, r1) -> Right (StatementCommand v1, r1)
+            Left e2 -> Left e2
+        
 
 -- | Parses Statement.
 -- Must be used in parseCommand.
 -- Reuse Lib2 as much as you can.
 -- You can change Lib2.parseQuery signature if needed.
+
+-- >>> parseStatements "BEGIN create_stop(S5, PLSWORK, 0.585, 0.866); create_stop(S6, stoppp, 0.5585, 0.76); END"
+-- Right (Batch [CreateStop StopId 'S' 5 Name "PLSWORK" Point (CoordX 0.585) (CoordY 0.866),CreateStop StopId 'S' 6 Name "stoppp" Point (CoordX 0.5585) (CoordY 0.76)],"")
+-- >>> parseStatements "BEGIN\ncreate_stop(S5, PLSWORK, 0.585, 0.866); create_stop(S6, stoppp, 0.5585, 0.76); END"
+-- Left "Unrecognized query format or Expected BEGIN received: BEGINcreate_stop(S5, PLSWORK, 0.585, 0.866); create_stop(S6, stoppp, 0.5585, 0.76); END"
 parseStatements :: String -> Either String (Statements, String)
 parseStatements input = 
-  case initialBEGIN input of
+  -- remove ALL NEW LINES SYMBOLS
+  let input' = concatMap (\c -> if c == '\n' then " " else [c]) input in
+  case initialBEGIN input' of
     Right r1 -> 
-      case many' r1 [] of
+      case many' r1 of
         Right (v2, r2) -> 
           case closingEND r2 of
-            Right r3 -> Right (v2, r3)
+            Right r3 -> let
+              outputLength = length r3
+              in case outputLength of
+                0 -> Right (v2, r3)
+                c -> Left $ "Input not fully parsed: " ++ show c
             Left e3 -> Left e3
         Left e2 -> Left e2
-    Left e1 -> Left e1
+    Left e1 -> 
+      case Lib2.parseQuery input' of
+        Right (v1, r1) -> Right (Single v1, r1)
+        Left e2 -> Left (e2 ++ " or " ++ e1 ++ "received: " ++ input')
     
   where
-    many' [] acc = 
+    many' input' = 
       let
-        size = length acc
-        in case size of
-          0 -> Left "No queries found"
-          1 -> Right (Single (head acc), [])
-          _ -> Right (Batch acc, []) 
+        parseMany = parseMany' input' []
+        in case parseMany of
+          Left e -> Left e
+          Right (v1, r1) -> 
+            let
+              size = length v1
+              in case size of
+                0 -> Left "No queries found"
+                1 -> Right (Single (head v1), r1)
+                _ -> Right (Batch v1, r1) 
 
-    many' input acc =
-      case Lib2.parseQuery input of
-        Right (v1, r1) -> many' r1 (acc ++ [v1])
-        Left _ -> 
-          case Lib2.parseExact "; " input of
-            Right (_, r2) -> many' r2 acc
-            Left e2 -> Left e2
+    parseMany' input' acc =
+      case Lib2.parseQuery input' of
+        Left _ -> Right (acc, input')
+        Right (v1, r1) -> 
+          case Lib2.parseExact "; " r1 of
+            Right (_, r2) -> parseMany' r2 (acc ++ [v1])
+            Left e2 -> case Lib2.parseExact ";" r1 of
+              Right (_, r2) -> parseMany' r2 (acc ++ [v1])
+              Left e3 -> Left $ e2 ++ " or " ++ e3
 
 initialBEGIN :: String -> Either String String
 initialBEGIN input = 
@@ -145,9 +166,11 @@ initialBEGIN input =
 
 closingEND :: String -> Either String String
 closingEND input = 
-  case Lib2.parseExact " END" input of
+  case Lib2.parseExact "END " input of
     Right (_, r) -> Right r
-    Left e -> Left e
+    Left _ -> case Lib2.parseExact "END" input of
+      Right (_, r) -> Right r
+      Left e -> Left (e ++ "received: " ++ input)
 
 -- | Converts program's state into Statements
 -- (probably a batch, but might be a single query)
@@ -242,17 +265,17 @@ createAllConnections state =
 renderStatements :: Statements -> String
 renderStatements batch = 
   let
-    startCommand = "BEGIN "
+    startCommand = "BEGIN\n"
     generatedCommands = loopOverCommands batch []
-    endCommand = " END"
-    in startCommand ++ show generatedCommands ++ endCommand
+    endCommand = "END\n"
+    in startCommand ++ generatedCommands ++ endCommand
 
   where
     loopOverCommands (Batch []) acc = acc
-    loopOverCommands (Batch (x:xs)) acc = loopOverCommands (Batch xs) (acc ++ [loopOverQuery x])
-    loopOverCommands (Single x) acc = acc ++ [loopOverQuery x]
+    loopOverCommands (Batch (x:xs)) acc = loopOverCommands (Batch xs) (acc ++ (loopOverQuery x) ++ ";\n")
+    loopOverCommands (Single x) acc = acc ++ (loopOverQuery x)
 
-    loopOverQuery (Lib2.CreateStop a@(Lib2.StopId cid id) n@(Lib2.Name name) point@(Lib2.Point x@(Lib2.CoordX xp) y@(Lib2.CoordY yp))) = "create_stop(" ++ show cid ++ show id ++ ", " ++ show name ++ ", " ++ show xp ++ ", " ++ show yp ++ ")"
+    loopOverQuery (Lib2.CreateStop a@(Lib2.StopId cid id) n@(Lib2.Name name) point@(Lib2.Point x@(Lib2.CoordX xp) y@(Lib2.CoordY yp))) = "create_stop(" ++ [cid] ++ show id ++ ", " ++ name ++ ", " ++ show xp ++ ", " ++ show yp ++ ")"
     loopOverQuery (Lib2.CreateRoute a@(Lib2.RouteId cid id) n@(Lib2.Name name) stops) = ---"create_route(" ++ show cid ++ show id ++ ", " ++ show name ++ ", " ++ loopOverStops stops ++ ")"
       let
         stopsOnly = map (\stop -> case stop of
@@ -261,14 +284,14 @@ renderStatements batch =
                                     Lib2.QueryStopOrCreatOrNextPrevFindNextStop _ -> error "Unexpected FindNextStop"
                                     Lib2.QueryStopOrCreatOrNextPrevFindPreviousStop _ -> error "Unexpected FindPreviousStop") stops
         manyStops = parseManyStops' stopsOnly []
-        in "create_route(" ++ show cid ++ show id ++ ", " ++ show name ++ manyStops ++ ")"
+        in "create_route(" ++ [cid] ++ show id ++ ", " ++ name ++ manyStops ++ ")"
 
       where 
         parseManyStops' [] acc = acc
-        parseManyStops' [a@(Lib2.StopId cid id)] acc = acc ++ ", " ++ show cid ++ show id
-        parseManyStops' (a@(Lib2.StopId cid id):xs) acc = parseManyStops' xs (acc ++ ", " ++ show cid ++ show id)
+        parseManyStops' [a@(Lib2.StopId cid id)] acc = acc ++ ", " ++ [cid] ++ show id
+        parseManyStops' (a@(Lib2.StopId cid id):xs) acc = parseManyStops' xs (acc ++ ", " ++ [cid] ++ show id)
 
-    loopOverQuery (Lib2.CreatePath a@(Lib2.PathId cid id) n@(Lib2.Name name) p@(Lib2.PathLenght length''') b@(Lib2.StopId cid' id') c@(Lib2.StopId cid'' id'')) = "create_path(" ++ show cid ++ show id ++ ", " ++ show name ++ ", " ++ show length''' ++ ", " ++ show cid' ++ show id' ++ ", " ++ show cid'' ++ show id'' ++ ")"
+    loopOverQuery (Lib2.CreatePath a@(Lib2.PathId cid id) n@(Lib2.Name name) p@(Lib2.PathLenght length''') b@(Lib2.StopId cid' id') c@(Lib2.StopId cid'' id'')) = "create_path(" ++ [cid] ++ show id ++ ", " ++ name ++ ", " ++ show length''' ++ ", " ++ [cid'] ++ show id' ++ ", " ++  [cid''] ++ show id'' ++ ")"
     loopOverQuery (Lib2.CreateTrip a@(Lib2.TripId cid id) n@(Lib2.Name name) stopOrPathie) = --"create_trip(" ++ show cid ++ show id ++ ", " ++ show name ++ ", " ++ loopOverStopOrPath stopOrPathie ++ ")"
       let
         stopOrPath = map (\stop -> case stop of
@@ -278,18 +301,18 @@ renderStatements batch =
         stringStopOrPath = parseStopOrPath stopOrPath []
 
 
-        in "create_trip(" ++ show cid ++ show id ++ ", " ++ show name ++ stringStopOrPath ++ ")"
+        in "create_trip(" ++ [cid] ++ show id ++ ", " ++ name ++ stringStopOrPath ++ ")"
 
         where
           parseStopOrPath [] acc = acc
-          parseStopOrPath [Lib2.StopId' a@(Lib2.StopId cid id)] acc = acc ++ ", " ++ show cid ++ show id
-          parseStopOrPath (Lib2.StopId' a@(Lib2.StopId cid id):xs) acc = parseStopOrPath xs (acc ++ ", " ++ show cid ++ show id)
+          parseStopOrPath [Lib2.StopId' a@(Lib2.StopId cid id)] acc = acc ++ ", " ++ [cid] ++ show id
+          parseStopOrPath (Lib2.StopId' a@(Lib2.StopId cid id):xs) acc = parseStopOrPath xs (acc ++ ", " ++ [cid] ++ show id)
           parseStopOrPath [Lib2.PathId' a@(Lib2.PathId cid id)] acc = acc ++ ", " ++ show cid ++ show id
-          parseStopOrPath (Lib2.PathId' a@(Lib2.PathId cid id):xs) acc = parseStopOrPath xs (acc ++ ", " ++ show cid ++ show id)
+          parseStopOrPath (Lib2.PathId' a@(Lib2.PathId cid id):xs) acc = parseStopOrPath xs (acc ++ ", " ++ [cid] ++ show id)
 
      
-    loopOverQuery (Lib2.SetNextStop a@(Lib2.StopId cid id) c@(Lib2.RouteId cid'' id'') b@(Lib2.StopId cid' id')) = "set_next_stop(" ++ show cid ++ show id ++ ", " ++ show cid'' ++ show id'' ++ ", " ++ show cid' ++ show id' ++ ")"
-    loopOverQuery (Lib2.SetPreviousStop a@(Lib2.StopId cid id) c@(Lib2.RouteId cid'' id'') b@(Lib2.StopId cid' id')) = "set_previous_stop(" ++ show cid ++ show id ++ ", " ++ show cid'' ++ show id'' ++ ", " ++ show cid' ++ show id' ++ ")"
+    loopOverQuery (Lib2.SetNextStop a@(Lib2.StopId cid id) c@(Lib2.RouteId cid'' id'') b@(Lib2.StopId cid' id')) = "set_next_stop(" ++ [cid] ++ show id ++ ", " ++ [cid''] ++ show id'' ++ ", " ++ [cid'] ++ show id' ++ ")"
+    loopOverQuery (Lib2.SetPreviousStop a@(Lib2.StopId cid id) c@(Lib2.RouteId cid'' id'') b@(Lib2.StopId cid' id')) = "set_previous_stop(" ++ [cid] ++ show id ++ ", " ++ [cid''] ++ show id'' ++ ", " ++ [cid'] ++ show id' ++ ")"
     loopOverQuery _ = error "Error in loopOverQuery"
 
 

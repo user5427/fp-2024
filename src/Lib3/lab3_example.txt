@@ -1,0 +1,40 @@
+:paste
+BEGIN
+create_stop(S1, Seskine, 0.55, 0.66);
+create_stop(S2, Gelvoneliu, 1.55, 1.66);
+create_stop(S3, Gelvonu, 2.55, 2.66);
+create_stop(S4, Jovaro, 3.55, 3.66);
+END
+
+-- Entering multi-line mode. Press <Ctrl-D> to finish.
+| BEGIN
+| create_stop(S1, Seskine, 0.55, 0.66);
+| create_stop(S2, Gelvoneliu, 1.55, 1.66);
+| create_stop(S3, Gelvonu, 2.55, 2.66);
+| create_stop(S4, Jovaro, 3.55, 3.66);
+| END
+| 
+[0] Stop Name "Seskine" created
+[1] Stop Name "Gelvoneliu" created
+[2] Stop Name "Gelvonu" created
+[3] Stop Name "Jovaro" created
+
+BEGIN create_route(R1, imabouttodiefromhaskell, S1, S2, S3, S4); connect_route_stops_by_min_dist(R1); END
+[0] Route Name "imabouttodiefromhaskell" created
+[1] Route stops connected by min distance
+
+>>> SAVE
+Saved
+>>> LOAD
+Loaded
+ctrl + z
+stack run fp2024-three
+
+>>> LOAD
+Loaded
+
+connect_route_stops_by_min_dist(R1)
+>>> connect_route_stops_by_min_dist(R1)
+ERROR:Next stop already exists for that route
+>>> check_if_route_stops_connected(R1)
+Route stops connected: True
