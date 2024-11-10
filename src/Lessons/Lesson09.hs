@@ -40,8 +40,8 @@ parseChar c = Parser $ \input ->
 
 -- >>> runParser parseA "fsdf"
 -- Left "Failed twise: a is not found in fsdf AND A is not found in fsdf"
--- >>> runParser parseA "Add"
--- Right ('A',"dd")
+-- >>> runParser parseA "caAdd"
+-- Right ('a',"Add")
 parseA :: Parser Char
 parseA = (parseChar 'a') <|> (parseChar 'A')
 

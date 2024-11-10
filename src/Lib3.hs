@@ -118,24 +118,20 @@ parseCommand input =
 parseStatements :: String -> Either String (Statements, String)
 parseStatements input = 
   -- remove ALL NEW LINES SYMBOLS
-  let input' = concatMap (\c -> if c == '\n' then " " else [c]) input in
-  case initialBEGIN input' of
-    Right r1 -> 
-      case many' r1 of
-        Right (v2, r2) -> 
-          case closingEND r2 of
-            Right r3 -> let
-              outputLength = length r3
-              in case outputLength of
-                0 -> Right (v2, r3)
-                c -> Left $ "Input not fully parsed: " ++ show c
-            Left e3 -> Left e3
-        Left e2 -> Left e2
-    Left e1 -> 
-      case Lib2.parseQuery input' of
-        Right (v1, r1) -> Right (Single v1, r1)
-        Left e2 -> Left (e2 ++ " or " ++ e1 ++ "received: " ++ input')
-    
+  let input' = concatMap (\c -> if c == '\n' then " " else [c]) input 
+      info = do
+        initString <- initialBEGIN input'
+        statements <- many' initString
+        endString <- closingEND $ snd statements
+        case length endString of
+          0 -> Right (fst statements, endString)
+          c -> Left $ "Input not fully parsed: " ++ show c
+      in case info of
+        Right (v1, r1) -> Right (v1, r1)
+        Left e -> case Lib2.parseQuery input' of
+          Right (v1, r1) -> Right (Single v1, r1)
+          Left e2 -> Left $ e ++ " or " ++ e2 ++ "received: " ++ input
+   
   where
     many' input' = 
       let
@@ -154,11 +150,22 @@ parseStatements input =
       case Lib2.parseQuery input' of
         Left _ -> Right (acc, input')
         Right (v1, r1) -> 
-          case Lib2.parseExact "; " r1 of
+          case runParser parseSeperator r1 of
             Right (_, r2) -> parseMany' r2 (acc ++ [v1])
-            Left e2 -> case Lib2.parseExact ";" r1 of
-              Right (_, r2) -> parseMany' r2 (acc ++ [v1])
-              Left e3 -> Left $ e2 ++ " or " ++ e3
+            Left e2 -> Left e2
+
+parseExact :: String -> Parser String
+parseExact expected = Parser {
+  runParser = \input -> 
+    let len = length expected
+    in if take len input == expected
+         then Right (expected, drop len input)
+         else Left $ "Expected " ++ expected
+}
+
+parseSeperator :: Parser String
+parseSeperator = (parseExact "; ") <|> (parseExact ";")
+
 
 initialBEGIN :: String -> Either String String
 initialBEGIN input = 
@@ -168,11 +175,9 @@ initialBEGIN input =
 
 closingEND :: String -> Either String String
 closingEND input = 
-  case Lib2.parseExact "END " input of
+  case runParser ((parseExact "END ") <|> (parseExact "END")) input of
     Right (_, r) -> Right r
-    Left _ -> case Lib2.parseExact "END" input of
-      Right (_, r) -> Right r
-      Left e -> Left (e ++ "received: " ++ input)
+    Left e -> Left (e ++ "received: " ++ input)
 
 -- | Converts program's state into Statements
 -- (probably a batch, but might be a single query)
@@ -185,9 +190,6 @@ marshallState states =
     trips = createAllTrips states
     connestions = createAllConnections states
     in Batch (stops ++ routes ++ paths ++ trips ++ connestions)
-
-
-
 
 createAllStops :: Lib2.State -> [Query]
 createAllStops state = 
@@ -338,15 +340,12 @@ stateTransition stateVar cmd ioChan = case cmd of
     loadedData <- readChan ackChan
     case parseStatements loadedData of
       Left e2 -> return $ Left ("Load failed: " ++ e2 ++ ". \nData: " ++ loadedData)
-      Right (v, a2) -> let
-        lengt = length a2
-        in case lengt of
-          0 -> case applyStatementsToState v (Lib2.emptyState) of 
-                Left e -> return $ Left ("Load failed: " ++ e)
-                Right (m, s) -> atomically $ do
-                  writeTVar stateVar s
-                  return $ Right (Just "Loaded")
-          _ -> return $ Left ("Not parsed fully: " ++ a2 ++ ". \nData: " ++ loadedData)
+      Right (v, a2) -> 
+        case applyStatementsToState v (Lib2.emptyState) of 
+          Left e -> return $ Left ("Load failed: " ++ e)
+          Right (_, s) -> atomically $ do
+            writeTVar stateVar s
+            return $ Right (Just "Loaded")
         
 
   SaveCommand -> do

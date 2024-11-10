@@ -83,8 +83,8 @@ instance Monad Parser where
                                 Left e2 -> Left e2
                                 Right (b, r2) -> Right (b, r2)
 
--- >>> runParser parseThreeDigits' "1234"
--- Right (('1','2','3'),"4")
+-- >>> runParser parseThreeDigits' "12a34"
+-- Left "a34 does not start with a digit"
 parseThreeDigits' :: Parser (Char, Char, Char)
 parseThreeDigits' = do
     a <- parseDigit
