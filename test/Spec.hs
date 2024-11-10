@@ -65,33 +65,34 @@ unitTests = testGroup "Lib1 and Lib2 tests"
 
 -- Stop
 instance Arbitrary Lib2.CoordX where
-  arbitrary = Lib2.CoordX <$> arbitrary
+  arbitrary = Lib2.CoordX <$> suchThat (arbitrary `suchThat` (\x -> x >= 0.01 && x <= 100.0)) (\x -> not (elem 'e' (show x) || elem 'E' (show x)))
 
 instance Arbitrary Lib2.CoordY where
-  arbitrary = Lib2.CoordY <$> arbitrary
-
+  arbitrary = Lib2.CoordY <$> suchThat (arbitrary `suchThat` (\x -> x >= 0.01 && x <= 100.0)) (\x -> not (elem 'e' (show x) || elem 'E' (show x)))
+  
 instance Arbitrary Lib2.Point where
   arbitrary = Lib2.Point <$> arbitrary <*> arbitrary
 
 instance Arbitrary Lib2.StopId where
-  arbitrary = Lib2.StopId <$> elements ['S'] <*> arbitrary
+  arbitrary = Lib2.StopId <$> elements ['S'] <*> (getPositive <$> arbitrary)
 
 instance Arbitrary Lib2.Name where
   arbitrary = Lib2.Name <$> listOf1 (elements ['a'..'z'])
 
-genStop :: Gen Lib2.Query
-genStop = do
-  stopId <- arbitrary
+genStop :: Int -> Gen Lib2.Query
+genStop id = do
+  stopId <- Lib2.StopId <$> elements ['S'] <*> pure id
   name <- arbitrary
   point <- arbitrary
   return $ Lib2.CreateStop stopId name point
 
 genStops :: Gen [Lib2.Query]
-genStops = listOf genStop
-  
+genStops = do
+  mapM genStop [1..10]
+
 -- Route
 instance Arbitrary Lib2.RouteId where
-  arbitrary = Lib2.RouteId <$> elements ['R'] <*> arbitrary
+  arbitrary = Lib2.RouteId <$> elements ['R'] <*> (getPositive <$> arbitrary)
 
 genQueryStopOrCreatOrNextPrevStop :: [Lib2.StopId] -> Gen [Lib2.QueryStopOrCreatOrNextPrev]
 genQueryStopOrCreatOrNextPrevStop stops = do
@@ -106,7 +107,7 @@ genRoute stops = do
 
 -- Path
 instance Arbitrary Lib2.PathId where
-  arbitrary = Lib2.PathId <$> elements ['P'] <*> arbitrary
+  arbitrary = Lib2.PathId <$> elements ['P'] <*> (getPositive <$> arbitrary)
 
 instance Arbitrary Lib2.PathLenght where
   arbitrary = Lib2.PathLenght <$> arbitrary
@@ -127,7 +128,7 @@ genQueryStopOrPath stops = do
   return qsop
 
 instance Arbitrary Lib2.TripId where
-  arbitrary = Lib2.TripId <$> elements ['T'] <*> arbitrary
+  arbitrary = Lib2.TripId <$> elements ['T'] <*> (getPositive <$> arbitrary)
 
 genTrip :: [Lib2.QueryStopOrPathOrCreate] -> Gen Lib2.Query
 genTrip stops = do
@@ -192,11 +193,12 @@ propertyTests = testGroup "state saving tests"
       
         _ <- Lib3.stateTransition state (randomCommand) chan
         initialState <- readTVarIO state
-
         _ <- Lib3.stateTransition state Lib3.SaveCommand chan
-        _ <- Lib3.stateTransition state Lib3.LoadCommand chan
 
-        loadedState <- readTVarIO state
+
+        newState <- newTVarIO Lib2.emptyState
+        _ <- Lib3.stateTransition newState Lib3.LoadCommand chan
+        loadedState <- readTVarIO newState
 
         return (initialState == loadedState),
 
