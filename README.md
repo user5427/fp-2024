@@ -1,17 +1,18 @@
 
 # fp-2024
 
-[lab1](lab1.md)
-[lab2](lab2.md)
+## [lab1](lab1.md)
+## [lab2](lab2.md)
 
 ## lab Three
 
 ### changes to lab2 code
-`parseQuery :: String -> Either String Query` changed to `parseQuery :: String -> Either String (Query, String)` for command batching to work.
+`parseQuery :: String -> Either String Query` changed to `parseQuery :: String -> Either String (Query, String)` for batch processin to work.
 
 ### grouping queries
 BNF Grouping queries syntax: ```<batch> ::= "BEGIN " <command_list> " END"```
-Examples
+
+Examples:
   * ```
     BEGIN create_stop(S1, Seskine, 0.55, 0.66); create_stop(S2, Gelvoneliu, 1.55, 1.66); END
   * ```
@@ -34,8 +35,8 @@ Examples
 [3] Stop Name "Jovaro" created
 ```
 
-### SAVE
-state.txt
+### SAVE & LOAD
+`state.txt`
 ```
 BEGIN create_stop(S1, Seskine, 0.55, 0.66); 
 create_stop(S2, Gelvoneliu, 1.55, 1.66); 
@@ -51,6 +52,6 @@ set_previous_stop(S4, R1, S3);
 END
 ```
 
-[lab3_example](src/Lib3/lab3_example.txt)
+### [lab3_example](src/Lib3/lab3_example.txt)
 
 
