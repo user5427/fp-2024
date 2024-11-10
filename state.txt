@@ -1,3 +1,2 @@
 BEGIN
-create_route(R14, syquocxankmzihnjkvydmpkppcyrh);
 END

@@ -6,21 +6,16 @@
 
 ## lab Three
 
+### changes to lab2 code
+`parseQuery :: String -> Either String Query` changed to `parseQuery :: String -> Either String (Query, String)` for command batching to work.
+
 ### grouping queries
 BNF Grouping queries syntax: ```<batch> ::= "BEGIN " <command_list> " END"```
 Examples
   * ```
     BEGIN create_stop(S1, Seskine, 0.55, 0.66); create_stop(S2, Gelvoneliu, 1.55, 1.66); END
-
-    [0] Stop Name "Seskine" created
-
-    [1] Stop Name "Gelvoneliu" created```
   * ```
     BEGIN create_route(R1, imabouttodiefromhaskell, S1, S2, S3, S4); connect_route_stops_by_min_dist(R1); END
-
-    [0] Route Name "imabouttodiefromhaskell" created
-
-    [1] Route stops connected by min distance
     ```
 
 ### :paste
@@ -56,7 +51,6 @@ set_previous_stop(S4, R1, S3);
 END
 ```
 
+[lab3_example](src/Lib3/lab3_example.txt)
 
 
-
-https://blog.oliverbalfour.com/haskell/2020/08/06/applicative-functors.html

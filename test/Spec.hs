@@ -98,20 +98,52 @@ genQueryStopOrCreatOrNextPrevStop stops = do
   qsocnp <- mapM (\stopId -> return $ Lib2.QueryStopOrCreatOrNextPrevStop stopId) stops
   return qsocnp
 
-getRoute :: [Lib2.QueryStopOrCreatOrNextPrev] -> Gen Lib2.Query
-getRoute stops = do
+genRoute :: [Lib2.QueryStopOrCreatOrNextPrev] -> Gen Lib2.Query
+genRoute stops = do
   routeId <- arbitrary
   name <- arbitrary
   return $ Lib2.CreateRoute routeId name stops
 
+-- Path
+instance Arbitrary Lib2.PathId where
+  arbitrary = Lib2.PathId <$> elements ['P'] <*> arbitrary
+
+instance Arbitrary Lib2.PathLenght where
+  arbitrary = Lib2.PathLenght <$> arbitrary
+
+genPath :: [Lib2.StopId] -> Gen Lib2.Query
+genPath stops = do
+  pathId <- arbitrary
+  name <- arbitrary
+  pathLenght <- arbitrary
+  stop1 <- elements stops
+  stop2 <- elements stops
+  return $ Lib2.CreatePath pathId name pathLenght stop1 stop2
+
+-- Trip
+genQueryStopOrPath :: [Lib2.StopId] -> Gen [Lib2.QueryStopOrPathOrCreate]
+genQueryStopOrPath stops = do
+  qsop <- mapM (\stopId -> return $ Lib2.QueryStopOrPath' (Lib2.StopId' stopId)) stops
+  return qsop
+
+instance Arbitrary Lib2.TripId where
+  arbitrary = Lib2.TripId <$> elements ['T'] <*> arbitrary
+
+genTrip :: [Lib2.QueryStopOrPathOrCreate] -> Gen Lib2.Query
+genTrip stops = do
+  tripId <- arbitrary
+  name <- arbitrary
+  return $ Lib2.CreateTrip tripId name stops
 
 -- QUERY GENERATOR
 genMultiQuery :: Gen [Lib2.Query]
 genMultiQuery = do
   stops <- genStops
   stopIds <- mapM (\(Lib2.CreateStop stopId _ _) -> return stopId) stops
-  route <- getRoute =<< genQueryStopOrCreatOrNextPrevStop stopIds -- grazu bet nebutina
-  return $ stops ++ [route]
+  route <- genRoute =<< genQueryStopOrCreatOrNextPrevStop stopIds
+  path <- genPath stopIds
+  trip <- genTrip =<< genQueryStopOrPath stopIds
+  return $ stops ++ [route] ++ [path] ++ [trip]
 
 
 instance Arbitrary Lib2.Query where

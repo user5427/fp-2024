@@ -38,3 +38,78 @@ connect_route_stops_by_min_dist(R1)
 ERROR:Next stop already exists for that route
 >>> check_if_route_stops_connected(R1)
 Route stops connected: True
+
+
+---------------------------
+
+
+>>> create_stop(S1, Seskine, 0.55, 0.66)
+Stop Name "Seskine" created
+>>> create_stop(S2, Gelvoneliu, 1.55, 1.66)
+Stop Name "Gelvoneliu" created
+>>> create_stop(S3, Gelvonu, 2.55, 2.66)
+Stop Name "Gelvonu" created
+>>> create_stop(S4, Jovaro, 3.55, 3.66)
+Stop Name "Jovaro" created
+>>> create_route(R1, imabouttodiefromhaskell, S1, S2, S3, S4)
+Route Name "imabouttodiefromhaskell" created
+>>> connect_route_stops_by_min_dist(R1)
+Route stops connected by min distance
+>>> create_route(R2, interestinggg, create_stop(S5, Kalvarijos, 6.55, 6.66), create_stop(S6, Jeruzale, 7.55, 7.66), create_stop(S7, Zalieji_ezereliai, 8.55, 8.66))
+Route Name "interestinggg" created
+>>> SAVE
+Saved
+
+RELOAD
+
+>>> LOAD
+Loaded
+>>> connect_route_stops_by_min_dist(R2)
+Route stops connected by min distance
+>>> join_two_routes(R1, R2, R3, new_route)
+Routes joined
+>>> create_trip(T1, trippy, S1, S2, S3)
+Trip Name "trippy" created
+>>> validate_trip(T1)
+Trip stops connected: True
+>>> trip_distance(T1)
+Trip distance: 2.828427
+>>> cleanup_trip(T1)
+Trip cleaned up
+>>> trip_distance(T1)
+Trip distance: 2.828427
+>>> create_path(P1, path, 1.0, S1, S2)create_path(P1, path, 1.0, S1, S2)
+PARSE ERROR: string is not fully consumed - create_path(P1, path, 1.0, S1, S2)
+>>> create_path(P1, path, 1.0, S1, S2)
+Path Name "path" created
+>>> reate_trip(T2, trip, S1, S2, P1, S3)
+PARSE ERROR:Expected BEGIN  or Unrecognized query formatreceived: reate_trip(T2, trip, S1, S2, P1, S3)
+>>> create_trip(T2, trip, S1, S2, P1, S3)
+Trip Name "trip" created
+>>> SAVE
+Saved
+
+RELOAD
+
+>>> BEGIN validate_trip(T2); create_trip(T3, trip2, S1, P1, S2, S3); validate_trip(T3); trip_distance(T3); END
+ERROR:Element not found
+>>> LOAD
+Loaded
+>>> BEGIN validate_trip(T2); create_trip(T3, trip2, S1, P1, S2, S3); validate_trip(T3); trip_distance(T3); END
+ERROR:Trip stops or paths are not connected
+>>> validate_trip(T1)
+Trip stops connected: True
+>>> validate_trip(T2)
+ERROR:Trip stops or paths are not connected
+>>> BEGIN create_trip(T3, trip2, S1, P1, S2, S3); validate_trip(T3); trip_distance(T3); END
+[0] Trip Name "trip2" created
+[1] Trip stops connected: True
+[2] Trip distance: 2.4142137
+
+>>> join_two_trips(T2, T3, T4, evenMore)
+Trips joined
+>>> validate_trip(T4)
+ERROR:Trip stops or paths are not connected
+>>> SAVE
+Saved
+>>> 
