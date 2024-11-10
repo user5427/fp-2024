@@ -1,4 +1,6 @@
 {-# LANGUAGE ImportQualifiedPost #-}
+{-# LANGUAGE InstanceSigs #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 import Test.Tasty ( TestTree, defaultMain, testGroup )
 import Test.Tasty.HUnit ( testCase, (@?=) )
 
@@ -9,6 +11,8 @@ import qualified Test.Tasty.QuickCheck as QC
 import Control.Concurrent
 import GHC.Conc
 import Foreign.Marshal (new)
+import Test.Tasty.QuickCheck
+
 
 main :: IO ()
 main = defaultMain tests
@@ -59,6 +63,73 @@ unitTests = testGroup "Lib1 and Lib2 tests"
         Right ((Lib2.JoinTwoTrips (Lib2.Trip' (Lib2.TripId 'T' 5)) (Lib2.CreateTrip' (Lib2.CreateTrip (Lib2.TripId 'T' 2) (Lib2.Name "B") [Lib2.CreateStop' (Lib2.CreateStop (Lib2.StopId 'S' 65) (Lib2.Name "1") (Lib2.Point (Lib2.CoordX (-48.952)) (Lib2.CoordY 0.6))),Lib2.FindNextStop' (Lib2.FindNextStop (Lib2.StopId 'S' 50) (Lib2.RouteId 'R' 65))])) (Lib2.TripId 'T' 99) (Lib2.Name "1X4R")), "")
   ]
 
+-- Stop
+instance Arbitrary Lib2.CoordX where
+  arbitrary = Lib2.CoordX <$> arbitrary
+
+instance Arbitrary Lib2.CoordY where
+  arbitrary = Lib2.CoordY <$> arbitrary
+
+instance Arbitrary Lib2.Point where
+  arbitrary = Lib2.Point <$> arbitrary <*> arbitrary
+
+instance Arbitrary Lib2.StopId where
+  arbitrary = Lib2.StopId <$> elements ['S'] <*> arbitrary
+
+instance Arbitrary Lib2.Name where
+  arbitrary = Lib2.Name <$> listOf1 (elements ['a'..'z'])
+
+genStop :: Gen Lib2.Query
+genStop = do
+  stopId <- arbitrary
+  name <- arbitrary
+  point <- arbitrary
+  return $ Lib2.CreateStop stopId name point
+
+genStops :: Gen [Lib2.Query]
+genStops = listOf genStop
+  
+-- Route
+instance Arbitrary Lib2.RouteId where
+  arbitrary = Lib2.RouteId <$> elements ['R'] <*> arbitrary
+
+genQueryStopOrCreatOrNextPrevStop :: [Lib2.StopId] -> Gen [Lib2.QueryStopOrCreatOrNextPrev]
+genQueryStopOrCreatOrNextPrevStop stops = do
+  qsocnp <- mapM (\stopId -> return $ Lib2.QueryStopOrCreatOrNextPrevStop stopId) stops
+  return qsocnp
+
+getRoute :: [Lib2.QueryStopOrCreatOrNextPrev] -> Gen Lib2.Query
+getRoute stops = do
+  routeId <- arbitrary
+  name <- arbitrary
+  return $ Lib2.CreateRoute routeId name stops
+
+
+-- QUERY GENERATOR
+genMultiQuery :: Gen [Lib2.Query]
+genMultiQuery = do
+  stops <- genStops
+  stopIds <- mapM (\(Lib2.CreateStop stopId _ _) -> return stopId) stops
+  route <- getRoute =<< genQueryStopOrCreatOrNextPrevStop stopIds -- grazu bet nebutina
+  return $ stops ++ [route]
+
+
+instance Arbitrary Lib2.Query where
+  arbitrary :: Gen Lib2.Query
+  arbitrary = oneof [ 
+    Lib2.CreateStop <$> arbitrary <*> arbitrary <*> arbitrary
+    ]
+
+instance Arbitrary Lib3.Statements where
+  arbitrary = oneof [
+      Lib3.Batch <$> genMultiQuery,
+      Lib3.Single <$> arbitrary
+    ]
+
+instance Arbitrary Lib3.Command where
+  arbitrary = oneof [
+      Lib3.StatementCommand <$> arbitrary
+    ]
 
 propertyTests :: TestTree
 propertyTests = testGroup "state saving tests"
@@ -79,38 +150,33 @@ propertyTests = testGroup "state saving tests"
                 
 
     QC.testProperty "state saving and loading produces the same result" $
-    let 
-      commands ="BEGIN create_stop(S1, Seskine, 0.55, 0.66); create_stop(S2, Gelvoneliu, 1.55, 1.66); create_stop(S3, Gelvonu, 2.55, 2.66); create_stop(S4, Jovaro, 3.55, 3.66); END"
-      parsed = Lib3.parseCommand commands
-      in case parsed of
-        Left _ -> QC.ioProperty $ return $ QC.property False 
-        Right commands -> QC.ioProperty $ do
-            chan <- newChan :: IO (Chan Lib3.StorageOp)
-            state <- newTVarIO Lib2.emptyState 
-            _ <- forkIO $ Lib3.storageOpLoop chan
-          
-            _ <- Lib3.stateTransition state (fst commands) chan
-            initialState <- readTVarIO state
+      QC.ioProperty $ do
+        chan <- newChan :: IO (Chan Lib3.StorageOp)
+        state <- newTVarIO Lib2.emptyState 
+        _ <- forkIO $ Lib3.storageOpLoop chan
 
-            _ <- Lib3.stateTransition state Lib3.SaveCommand chan
-            _ <- Lib3.stateTransition state Lib3.LoadCommand chan
+        -- Generate a random Command using QuickCheck
+        randomCommand <- generate arbitrary :: IO Lib3.Command
+      
+        _ <- Lib3.stateTransition state (randomCommand) chan
+        initialState <- readTVarIO state
 
-            loadedState <- readTVarIO state
+        _ <- Lib3.stateTransition state Lib3.SaveCommand chan
+        _ <- Lib3.stateTransition state Lib3.LoadCommand chan
 
-            return (initialState == loadedState),
+        loadedState <- readTVarIO state
+
+        return (initialState == loadedState),
 
     QC.testProperty "marshalling and unmarshalling produces the same result" $
-      let 
-         commands ="BEGIN create_stop(S1, Seskine, 0.55, 0.66); create_stop(S2, Gelvoneliu, 1.55, 1.66); create_stop(S3, Gelvonu, 2.55, 2.66); create_stop(S4, Jovaro, 3.55, 3.66); END"
-         parsed = Lib3.parseCommand commands
-          in case parsed of
-            Left _ -> QC.ioProperty $ return $ QC.property False 
-            Right commands -> QC.ioProperty $ do
+         QC.ioProperty $ do
               chan <- newChan :: IO (Chan Lib3.StorageOp)
               state <- newTVarIO Lib2.emptyState 
               _ <- forkIO $ Lib3.storageOpLoop chan
 
-              _ <- Lib3.stateTransition state (fst commands) chan
+              randomCommand <- generate arbitrary :: IO Lib3.Command
+
+              _ <- Lib3.stateTransition state (randomCommand) chan
 
               initialState <- readTVarIO state
 

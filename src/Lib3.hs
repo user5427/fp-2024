@@ -8,6 +8,7 @@ module Lib3
     marshallState,
     renderStatements,
     Command(..),
+    Statements(..),
     ) where
 
 import Control.Concurrent ( Chan, readChan, writeChan )
