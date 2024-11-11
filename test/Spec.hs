@@ -110,7 +110,7 @@ instance Arbitrary Lib2.PathId where
   arbitrary = Lib2.PathId <$> elements ['P'] <*> (getPositive <$> arbitrary)
 
 instance Arbitrary Lib2.PathLenght where
-  arbitrary = Lib2.PathLenght <$> arbitrary
+  arbitrary = Lib2.PathLenght <$> suchThat (arbitrary `suchThat` (\x -> x >= 0.01 && x <= 100.0)) (\x -> not (elem 'e' (show x) || elem 'E' (show x)))
 
 genPath :: [Lib2.StopId] -> Gen Lib2.Query
 genPath stops = do

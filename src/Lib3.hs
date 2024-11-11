@@ -94,65 +94,84 @@ data Command = StatementCommand Statements |
 -- | Parses user's input.
 parseCommand :: String -> Either String (Command, String)
 parseCommand input = 
-  let
-    parseIT = parseStatements input
-    in case Lib2.parseExact "LOAD" input of
-      Right (_, r2) -> Right (LoadCommand, r2)
-      Left _ -> 
-        case Lib2.parseExact "SAVE" input of
-          Right (_, r3) -> Right (SaveCommand, r3)
-          Left _ -> case parseIT of
-            Right (v1, r1) -> Right (StatementCommand v1, r1)
-            Left e2 -> Left e2
+  case runParser (parseLoadingCommand <|> parseStatementsCommand) input of
+    Right (v1, r1) -> Right (v1, r1)
+    Left e -> Left e
         
+parseLoadingCommand :: Parser Command
+parseLoadingCommand = Parser {
+  runParser = \input -> 
+    case Lib2.parseExact "LOAD" input of
+      Right (_, r) -> Right (LoadCommand, r)
+      Left e -> case Lib2.parseExact "SAVE" input of
+        Right (_, r) -> Right (SaveCommand, r)
+        Left e2 -> Left e2
+}
+
+parseStatementsCommand :: Parser Command
+parseStatementsCommand = Parser {
+  runParser = \input -> 
+    case parseStatements input of
+      Right (v1, r1) -> Right (StatementCommand v1, r1)
+      Left e -> Left e
+}
+
+-- Right (Batch [CreateStop StopId 'S' 5 Name "PLSWORK" Point (CoordX 0.585) (CoordY 0.866),CreateStop StopId 'S' 6 Name "stoppp" Point (CoordX 0.5585) (CoordY 0.76)],"")
+-- >>> parseStatements "BEGIN\ncreate_stop(S5, PLSWORK, 0.585, 0.866); create_stop(S6, stoppp, 0.5585, 0.76); END"
+-- Left "Unrecognized query format or Expected BEGIN received: BEGINcreate_stop(S5, PLSWORK, 0.585, 0.866); create_stop(S6, stoppp, 0.5585, 0.76); END"
+multiStringParser :: Parser Statements
+multiStringParser = Parser {
+  runParser = \input ->
+    do
+    example <- (,) <$> (closingEND =<< (snd <$> (many' =<< initialBEGIN input))) <*> (fst <$> (many' =<< initialBEGIN input))
+    case length $ fst example of
+      0 -> Right (snd example, fst example)
+      c -> Left $ "Input not fully parsed: " ++ show c
+}
+  where
+      many' input' = 
+        let
+          parseMany = parseMany' input' []
+          in case parseMany of
+            Left e -> Left e
+            Right (v1, r1) -> 
+              let
+                size = length v1
+                in case size of
+                  0 -> Left "No queries found"
+                  1 -> Right (Single (head v1), r1)
+                  _ -> Right (Batch v1, r1) 
+
+      parseMany' input' acc =
+        case Lib2.parseQuery input' of
+          Left _ -> Right (acc, input')
+          Right (v1, r1) -> 
+            case runParser parseSeperator r1 of
+              Right (_, r2) -> parseMany' r2 (acc ++ [v1])
+              Left e2 -> Left e2
+  
+
+singleStatementParser :: Parser Statements
+singleStatementParser = Parser {
+  runParser = \input' -> 
+    case Lib2.parseQuery input' of
+      Right (v1, r1) -> Right (Single v1, r1)
+      Left e -> Left e
+}
 
 -- | Parses Statement.
 -- Must be used in parseCommand.
 -- Reuse Lib2 as much as you can.
 -- You can change Lib2.parseQuery signature if needed.
-
--- >>> parseStatements "BEGIN create_stop(S5, PLSWORK, 0.585, 0.866); create_stop(S6, stoppp, 0.5585, 0.76); END"
--- Right (Batch [CreateStop StopId 'S' 5 Name "PLSWORK" Point (CoordX 0.585) (CoordY 0.866),CreateStop StopId 'S' 6 Name "stoppp" Point (CoordX 0.5585) (CoordY 0.76)],"")
--- >>> parseStatements "BEGIN\ncreate_stop(S5, PLSWORK, 0.585, 0.866); create_stop(S6, stoppp, 0.5585, 0.76); END"
--- Left "Unrecognized query format or Expected BEGIN received: BEGINcreate_stop(S5, PLSWORK, 0.585, 0.866); create_stop(S6, stoppp, 0.5585, 0.76); END"
 parseStatements :: String -> Either String (Statements, String)
 parseStatements input = 
   -- remove ALL NEW LINES SYMBOLS
   let input' = concatMap (\c -> if c == '\n' then " " else [c]) input 
-      info = do
-        initString <- initialBEGIN input'
-        statements <- many' initString
-        endString <- closingEND $ snd statements
-        case length endString of
-          0 -> Right (fst statements, endString)
-          c -> Left $ "Input not fully parsed: " ++ show c
-      in case info of
-        Right (v1, r1) -> Right (v1, r1)
-        Left e -> case Lib2.parseQuery input' of
-          Right (v1, r1) -> Right (Single v1, r1)
-          Left e2 -> Left $ e ++ " or " ++ e2 ++ "received: " ++ input
+    in case runParser (multiStringParser <|> singleStatementParser) input' of
+      Right (v1, r1) -> Right (v1, r1)
+      Left e -> Left e
    
-  where
-    many' input' = 
-      let
-        parseMany = parseMany' input' []
-        in case parseMany of
-          Left e -> Left e
-          Right (v1, r1) -> 
-            let
-              size = length v1
-              in case size of
-                0 -> Left "No queries found"
-                1 -> Right (Single (head v1), r1)
-                _ -> Right (Batch v1, r1) 
-
-    parseMany' input' acc =
-      case Lib2.parseQuery input' of
-        Left _ -> Right (acc, input')
-        Right (v1, r1) -> 
-          case runParser parseSeperator r1 of
-            Right (_, r2) -> parseMany' r2 (acc ++ [v1])
-            Left e2 -> Left e2
+ 
 
 parseExact :: String -> Parser String
 parseExact expected = Parser {
