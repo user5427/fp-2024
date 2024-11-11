@@ -11,6 +11,7 @@ module Lib3
     Statements(..),
     ) where
 
+import Numeric (showFFloat)
 import Control.Concurrent ( Chan, readChan, writeChan )
 import Control.Concurrent.STM(STM, TVar)
 import qualified Lib2
@@ -298,7 +299,7 @@ renderStatements batch =
     loopOverCommands (Batch (x:xs)) acc = loopOverCommands (Batch xs) (acc ++ (loopOverQuery x) ++ ";\n")
     loopOverCommands (Single x) acc = (acc ++ (loopOverQuery x) ++ ";\n")
 
-    loopOverQuery (Lib2.CreateStop a@(Lib2.StopId cid id) n@(Lib2.Name name) point@(Lib2.Point x@(Lib2.CoordX xp) y@(Lib2.CoordY yp))) = "create_stop(" ++ [cid] ++ show id ++ ", " ++ name ++ ", " ++ show xp ++ ", " ++ show yp ++ ")"
+    loopOverQuery (Lib2.CreateStop a@(Lib2.StopId cid id) n@(Lib2.Name name) point@(Lib2.Point x@(Lib2.CoordX xp) y@(Lib2.CoordY yp))) = "create_stop(" ++ [cid] ++ show id ++ ", " ++ name ++ ", " ++ (showFFloat Nothing xp "")  ++ ", " ++ (showFFloat Nothing yp "") ++ ")"
     loopOverQuery (Lib2.CreateRoute a@(Lib2.RouteId cid id) n@(Lib2.Name name) stops) = ---"create_route(" ++ show cid ++ show id ++ ", " ++ show name ++ ", " ++ loopOverStops stops ++ ")"
       let
         stopsOnly = map (\stop -> case stop of
@@ -314,7 +315,7 @@ renderStatements batch =
         parseManyStops' [a@(Lib2.StopId cid id)] acc = acc ++ ", " ++ [cid] ++ show id
         parseManyStops' (a@(Lib2.StopId cid id):xs) acc = parseManyStops' xs (acc ++ ", " ++ [cid] ++ show id)
 
-    loopOverQuery (Lib2.CreatePath a@(Lib2.PathId cid id) n@(Lib2.Name name) p@(Lib2.PathLenght length''') b@(Lib2.StopId cid' id') c@(Lib2.StopId cid'' id'')) = "create_path(" ++ [cid] ++ show id ++ ", " ++ name ++ ", " ++ show length''' ++ ", " ++ [cid'] ++ show id' ++ ", " ++  [cid''] ++ show id'' ++ ")"
+    loopOverQuery (Lib2.CreatePath a@(Lib2.PathId cid id) n@(Lib2.Name name) p@(Lib2.PathLenght length''') b@(Lib2.StopId cid' id') c@(Lib2.StopId cid'' id'')) = "create_path(" ++ [cid] ++ show id ++ ", " ++ name ++ ", " ++ (showFFloat Nothing length''' "") ++ ", " ++ [cid'] ++ show id' ++ ", " ++  [cid''] ++ show id'' ++ ")"
     loopOverQuery (Lib2.CreateTrip a@(Lib2.TripId cid id) n@(Lib2.Name name) stopOrPathie) = --"create_trip(" ++ show cid ++ show id ++ ", " ++ show name ++ ", " ++ loopOverStopOrPath stopOrPathie ++ ")"
       let
         stopOrPath = map (\stop -> case stop of
