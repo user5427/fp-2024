@@ -277,7 +277,7 @@ renderStatements batch =
   where
     loopOverCommands (Batch []) acc = acc
     loopOverCommands (Batch (x:xs)) acc = loopOverCommands (Batch xs) (acc ++ (loopOverQuery x) ++ ";\n")
-    loopOverCommands (Single x) acc = acc ++ (loopOverQuery x)
+    loopOverCommands (Single x) acc = (acc ++ (loopOverQuery x) ++ ";\n")
 
     loopOverQuery (Lib2.CreateStop a@(Lib2.StopId cid id) n@(Lib2.Name name) point@(Lib2.Point x@(Lib2.CoordX xp) y@(Lib2.CoordY yp))) = "create_stop(" ++ [cid] ++ show id ++ ", " ++ name ++ ", " ++ show xp ++ ", " ++ show yp ++ ")"
     loopOverQuery (Lib2.CreateRoute a@(Lib2.RouteId cid id) n@(Lib2.Name name) stops) = ---"create_route(" ++ show cid ++ show id ++ ", " ++ show name ++ ", " ++ loopOverStops stops ++ ")"

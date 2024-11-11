@@ -168,18 +168,24 @@ propertyTests :: TestTree
 propertyTests = testGroup "state saving tests"
   [
     QC.testProperty "parse statements and renderStatements produces the same result" $
-      let 
-          statements = "BEGIN create_stop(S1, Seskine, 0.55, 0.66); create_stop(S2, Gelvoneliu, 1.55, 1.66); create_stop(S3, Gelvonu, 2.55, 2.66); create_stop(S4, Jovaro, 3.55, 3.66); END"
-          parsed = Lib3.parseStatements statements
-          in case parsed of
-            Left _ -> False
-            Right statements -> 
-              let
-                rendered = Lib3.renderStatements $ fst statements
-                parse2 = Lib3.parseStatements rendered
-              in case parse2 of
-                Left _ -> False
-                Right statements2 -> statements == statements2,
+      QC.ioProperty $ do
+        randomStatements <- generate arbitrary :: IO Lib3.Statements
+        let
+          rendered = Lib3.renderStatements randomStatements
+          parse2 = Lib3.parseStatements rendered
+          in case parse2 of
+          Left err -> do
+            putStrLn $ "Parsing failed with error: " ++ err
+            putStrLn $ "Rendered statements: " ++ rendered
+            return False
+          Right statements2 -> 
+            if randomStatements == fst statements2
+            then return True
+            else do 
+              putStrLn "Statements do not match after parsing and rendering."
+              putStrLn $ "Original statements: " ++ show randomStatements
+              putStrLn $ "Parsed statements: " ++ show (fst statements2)
+              return False,
                 
 
     QC.testProperty "state saving and loading produces the same result" $
