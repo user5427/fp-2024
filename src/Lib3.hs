@@ -379,7 +379,7 @@ stateTransition stateVar cmd ioChan = case cmd of
 
   StatementCommand statements -> do
     currentState <- readTVarIO stateVar
-    case applyStatementsToState statements currentState of
+    case applyStatementsToState statements currentState of -- applynimo metu gaunam arba klaida arba nauja state
       Left e -> return $ Left e
       Right (m, s) -> atomically $ do
         writeTVar stateVar s

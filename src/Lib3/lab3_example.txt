@@ -1,4 +1,4 @@
-:paste
+::paste
 BEGIN
 create_stop(S1, Seskine, 0.55, 0.66);
 create_stop(S2, Gelvoneliu, 1.55, 1.66);
@@ -113,3 +113,5 @@ ERROR:Trip stops or paths are not connected
 >>> SAVE
 Saved
 >>> 
+
+-- view state, atomically 

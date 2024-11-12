@@ -136,6 +136,7 @@ data Query
   | CheckIfRouteStopsConnected RouteId -- +
   | DistanceBetweenStops StopId StopId -- +
   | AssignStopToRoute StopId RouteId -- +
+  | View
 
 
 
@@ -532,6 +533,14 @@ parseQueryCreateStop input =
     in case res of
       Left e1 -> Left e1
       Right (r1, v1) -> Right (r1, v1)
+
+parseQueryViewState :: Parser Query
+parseQueryViewState input =
+  let
+    res = parseExact "VIEW" input
+    in case res of
+      Left e1 -> Left e1
+      Right (r1, v1) -> Right (View, v1)
 -- <create_route> ::= "create_route(" <route_id> ", " <name> ", " <list_of_stop_ids> ")"
 parseQueryCreateRoute :: Parser Query
 parseQueryCreateRoute input =
@@ -743,7 +752,8 @@ parseQuery input =
               `or2` parseQueryFindPreviousStop `or2` parseQueryTripDistance 
                 `or2` parseQuerySetNextStop `or2` parseQuerySetPreviousStop 
                   `or2` parseQueryConnectRouteStopsByMinDistance `or2` parseQueryCheckIfRouteStopsConnected 
-                    `or2` parseQueryDistanceBetweenStops `or2` parseQueryAssignStopToRoute) input
+                    `or2` parseQueryDistanceBetweenStops `or2` parseQueryAssignStopToRoute
+                      `or2` parseQueryViewState) input
     in case res of
       Left e1 -> Left "Unrecognized query format" -- e1
       Right (r1, v1) -> Right (r1, v1)
@@ -1811,7 +1821,7 @@ parseQueryStopOrCreatOrNextPrevListData (h:t) state =
             Right (stopList, newState') -> Right (stop : stopList, newState')
 
 
-        
+   
 
 
 -- | An entity which represents your program's state.
@@ -2198,6 +2208,7 @@ stateTransition state query =
     (JoinTwoRoutesAtStop _ _ _ _ _) -> case joinTwoRoutesAtStop state query of
       Right (route, state') -> Right (Just ("Routes joined at stop"), state')
       Left e1 -> Left e1
+    (View) -> Right (Just $ show state, state)
     _ -> Left "Invalid query"
 
 
