@@ -94,14 +94,14 @@ data Command = StatementCommand Statements |
 
 -- | Parses user's input.
 parseCommand :: String -> Either String (Command, String)
-parseCommand input = 
+parseCommand input =
   case runParser (parseLoadingCommand <|> parseStatementsCommand) input of
     Right (v1, r1) -> Right (v1, r1)
     Left e -> Left e
-        
+
 parseLoadingCommand :: Parser Command
 parseLoadingCommand = Parser {
-  runParser = \input -> 
+  runParser = \input ->
     case Lib2.parseExact "LOAD" input of
       Right (_, r) -> Right (LoadCommand, r)
       Left e -> case Lib2.parseExact "SAVE" input of
@@ -111,7 +111,7 @@ parseLoadingCommand = Parser {
 
 parseStatementsCommand :: Parser Command
 parseStatementsCommand = Parser {
-  runParser = \input -> 
+  runParser = \input ->
     case parseStatements input of
       Right (v1, r1) -> Right (StatementCommand v1, r1)
       Left e -> Left e
@@ -130,31 +130,31 @@ multiStringParser = Parser {
       c -> Left $ "Input not fully parsed: " ++ show c
 }
   where
-      many' input' = 
+      many' input' =
         let
           parseMany = parseMany' input' []
           in case parseMany of
             Left e -> Left e
-            Right (v1, r1) -> 
+            Right (v1, r1) ->
               let
                 size = length v1
                 in case size of
                   0 -> Left "No queries found"
                   1 -> Right (Single (head v1), r1)
-                  _ -> Right (Batch v1, r1) 
+                  _ -> Right (Batch v1, r1)
 
       parseMany' input' acc =
         case Lib2.parseQuery input' of
           Left _ -> Right (acc, input')
-          Right (v1, r1) -> 
+          Right (v1, r1) ->
             case runParser parseSeperator r1 of
               Right (_, r2) -> parseMany' r2 (acc ++ [v1])
               Left e2 -> Left e2
-  
+
 
 singleStatementParser :: Parser Statements
 singleStatementParser = Parser {
-  runParser = \input' -> 
+  runParser = \input' ->
     case Lib2.parseQuery input' of
       Right (v1, r1) -> Right (Single v1, r1)
       Left e -> Left e
@@ -165,18 +165,18 @@ singleStatementParser = Parser {
 -- Reuse Lib2 as much as you can.
 -- You can change Lib2.parseQuery signature if needed.
 parseStatements :: String -> Either String (Statements, String)
-parseStatements input = 
+parseStatements input =
   -- remove ALL NEW LINES SYMBOLS
-  let input' = concatMap (\c -> if c == '\n' then " " else [c]) input 
+  let input' = concatMap (\c -> if c == '\n' then " " else [c]) input
     in case runParser (multiStringParser <|> singleStatementParser) input' of
       Right (v1, r1) -> Right (v1, r1)
       Left e -> Left e
-   
- 
+
+
 
 parseExact :: String -> Parser String
 parseExact expected = Parser {
-  runParser = \input -> 
+  runParser = \input ->
     let len = length expected
     in if take len input == expected
          then Right (expected, drop len input)
@@ -188,13 +188,13 @@ parseSeperator = (parseExact "; ") <|> (parseExact ";")
 
 
 initialBEGIN :: String -> Either String String
-initialBEGIN input = 
+initialBEGIN input =
   case Lib2.parseExact "BEGIN " input of
     Right (_, r) -> Right r
     Left e -> Left e
 
 closingEND :: String -> Either String String
-closingEND input = 
+closingEND input =
   case runParser ((parseExact "END ") <|> (parseExact "END")) input of
     Right (_, r) -> Right r
     Left e -> Left (e ++ "received: " ++ input)
@@ -212,61 +212,61 @@ marshallState states =
     in Batch (stops ++ routes ++ paths ++ trips ++ connestions)
 
 createAllStops :: Lib2.State -> [Query]
-createAllStops state = 
+createAllStops state =
   let
     stopCreatingCommand = stopCreatingCommand' (Lib2.stops state) [] -- "create_stop(S1, PlsHelp, 0.55, 0.66)"
     in stopCreatingCommand
 
-  where 
+  where
     stopCreatingCommand' [] acc = acc
-    stopCreatingCommand' (stop@(Lib2.Stop id name point _ _ _):xs) acc = 
-      let 
+    stopCreatingCommand' (stop@(Lib2.Stop id name point _ _ _):xs) acc =
+      let
         st = Lib2.CreateStop id name point
         in stopCreatingCommand' xs (acc ++ [st])
-        
+
 createAllRoutes :: Lib2.State -> [Query] -- "create_route(R1, imabouttodiefromhaskell, S1, S2, S3)"
-createAllRoutes state = 
+createAllRoutes state =
   let
     routeCreatingCommand = routeCreatingCommand' (Lib2.routes state) []
     in routeCreatingCommand
 
   where
     routeCreatingCommand' [] acc = acc
-    routeCreatingCommand' (route@(Lib2.Route id name stops):xs) acc = 
+    routeCreatingCommand' (route@(Lib2.Route id name stops):xs) acc =
       let
         transform = map (\id -> Lib2.QueryStopOrCreatOrNextPrevStop id) stops
         rt = Lib2.CreateRoute id name (transform)
         in routeCreatingCommand' xs (acc ++ [rt])
 
 createAllPaths :: Lib2.State -> [Query] -- "create_path(P1, path, 1.0, S1, S2)"
-createAllPaths state = 
+createAllPaths state =
   let
     pathCreatingCommand = pathCreatingCommand' (Lib2.paths state) []
     in pathCreatingCommand
 
   where
     pathCreatingCommand' [] acc = acc
-    pathCreatingCommand' (path@(Lib2.Path id name length stop1 stop2):xs) acc = 
+    pathCreatingCommand' (path@(Lib2.Path id name length stop1 stop2):xs) acc =
       let
         pt = Lib2.CreatePath id name length stop1 stop2
         in pathCreatingCommand' xs (acc ++ [pt])
 
 createAllTrips :: Lib2.State -> [Query] -- "create_trip(T1, trip, S1, S2, P1, S3)" S1 S2 P1 S3 - list of StopOrPath
-createAllTrips state = 
+createAllTrips state =
   let
     tripCreatingCommand = tripCreatingCommand' (Lib2.trips state) []
     in tripCreatingCommand
 
   where
     tripCreatingCommand' [] acc = acc
-    tripCreatingCommand' (trip@(Lib2.Trip id name stopOrPathie):xs) acc = 
+    tripCreatingCommand' (trip@(Lib2.Trip id name stopOrPathie):xs) acc =
       let
         transform = map (\id -> Lib2.QueryStopOrPath' id) stopOrPathie
         tr = Lib2.CreateTrip id name transform
         in tripCreatingCommand' xs (acc ++ [tr])
 
 createAllConnections :: Lib2.State -> [Query] -- "set_next_stop(S1, R1, S2)" "set_previous_stop(S1, R1, S2)" SetNextStop SetPreviousStop
-createAllConnections state = 
+createAllConnections state =
   let
     stops = Lib2.stops state -- data Stop = Stop StopId Name Point [NextStop] [PreviousStop] [RouteId] deriving (Show, Eq)
     generateConnection = generateConnection' stops []
@@ -274,7 +274,7 @@ createAllConnections state =
 
     where
       generateConnection' [] acc = acc
-      generateConnection' (stop@(Lib2.Stop id name point nextStops previousStops routes):xs) acc = 
+      generateConnection' (stop@(Lib2.Stop id name point nextStops previousStops routes):xs) acc =
         let
           nextStop = map (\(Lib2.NextStop stopId routeId) -> Lib2.SetNextStop id routeId stopId) nextStops
           previousStop = map (\(Lib2.PreviousStop stopId routeId) -> Lib2.SetPreviousStop id routeId stopId) previousStops
@@ -287,7 +287,7 @@ createAllConnections state =
 -- Must have a property test
 -- for all s: parseStatements (renderStatements s) == Right(s, "")
 renderStatements :: Statements -> String
-renderStatements batch = 
+renderStatements batch =
   let
     startCommand = "BEGIN\n"
     generatedCommands = loopOverCommands batch []
@@ -310,7 +310,7 @@ renderStatements batch =
         manyStops = parseManyStops' stopsOnly []
         in "create_route(" ++ [cid] ++ show id ++ ", " ++ name ++ manyStops ++ ")"
 
-      where 
+      where
         parseManyStops' [] acc = acc
         parseManyStops' [a@(Lib2.StopId cid id)] acc = acc ++ ", " ++ [cid] ++ show id
         parseManyStops' (a@(Lib2.StopId cid id):xs) acc = parseManyStops' xs (acc ++ ", " ++ [cid] ++ show id)
@@ -334,7 +334,7 @@ renderStatements batch =
           parseStopOrPath [Lib2.PathId' a@(Lib2.PathId cid id)] acc = acc ++ ", " ++ show cid ++ show id
           parseStopOrPath (Lib2.PathId' a@(Lib2.PathId cid id):xs) acc = parseStopOrPath xs (acc ++ ", " ++ [cid] ++ show id)
 
-     
+
     loopOverQuery (Lib2.SetNextStop a@(Lib2.StopId cid id) c@(Lib2.RouteId cid'' id'') b@(Lib2.StopId cid' id')) = "set_next_stop(" ++ [cid] ++ show id ++ ", " ++ [cid''] ++ show id'' ++ ", " ++ [cid'] ++ show id' ++ ")"
     loopOverQuery (Lib2.SetPreviousStop a@(Lib2.StopId cid id) c@(Lib2.RouteId cid'' id'') b@(Lib2.StopId cid' id')) = "set_previous_stop(" ++ [cid] ++ show id ++ ", " ++ [cid''] ++ show id'' ++ ", " ++ [cid'] ++ show id' ++ ")"
     loopOverQuery _ = error "Error in loopOverQuery"
@@ -358,15 +358,14 @@ stateTransition stateVar cmd ioChan = case cmd of
     ackChan <- newChan
     writeChan ioChan (Load ackChan)
     loadedData <- readChan ackChan
-    case parseStatements loadedData of
+    atomically $ case parseStatements loadedData of
       Left e2 -> return $ Left ("Load failed: " ++ e2 ++ ". \nData: " ++ loadedData)
-      Right (v, a2) -> 
-        case applyStatementsToState v (Lib2.emptyState) of 
+      Right (v, _) ->
+        case applyStatementsToState v (Lib2.emptyState) of
           Left e -> return $ Left ("Load failed: " ++ e)
-          Right (_, s) -> atomically $ do
+          Right (_, s) -> do
             writeTVar stateVar s
             return $ Right (Just "Loaded")
-        
 
   SaveCommand -> do
     currentState <- readTVarIO stateVar
@@ -377,35 +376,35 @@ stateTransition stateVar cmd ioChan = case cmd of
     _ <- readChan ackChan  -- Wait for confirmation from storageOpLoop
     return $ Right (Just "Saved")
 
-  StatementCommand statements -> do
-    currentState <- readTVarIO stateVar
+  StatementCommand statements -> atomically $ do
+    currentState <- readTVar stateVar
     case applyStatementsToState statements currentState of -- applynimo metu gaunam arba klaida arba nauja state
       Left e -> return $ Left e
-      Right (m, s) -> atomically $ do
+      Right (m, s) -> do
         writeTVar stateVar s
         return $ Right m
 
-    
+
 
 applyStatementsToState :: Statements -> Lib2.State -> Either String (Maybe String, Lib2.State)
 applyStatementsToState statements state = applyStatementsToState' statements state [] 0
   where
-    applyStatementsToState' (Single st) state' _ _ = 
+    applyStatementsToState' (Single st) state' _ _ =
       case Lib2.stateTransition state' st of
         Left e -> Left e
-        Right (m, s) -> 
-          case m of 
+        Right (m, s) ->
+          case m of
             Just message -> Right (Just message, s)
             Nothing -> Right (Nothing, s)
-            
-    applyStatementsToState' (Batch []) state' messages _ = 
+
+    applyStatementsToState' (Batch []) state' messages _ =
       let finalMessage = if null messages then Nothing else Just (unlines messages)
       in Right (finalMessage, state')
 
-    applyStatementsToState' (Batch (x:xs)) state' messages depth = 
+    applyStatementsToState' (Batch (x:xs)) state' messages depth =
       case Lib2.stateTransition state' x of
         Left e -> Left e
-        Right (m, s) -> 
-          case m of 
+        Right (m, s) ->
+          case m of
             Just message -> applyStatementsToState' (Batch xs) s (messages ++ ["[" ++ show depth ++ "] " ++ message]) (depth + 1)
             Nothing -> applyStatementsToState' (Batch xs) s (messages ++ ["[" ++ show depth ++ "]"]) (depth + 1)
