@@ -1,3 +1,39 @@
+SAVE
+validate_trip(T4)
+join_two_trips(T2, T3, T4, evenMore)
+BEGIN create_trip(T3, trip2, S1, P1, S2, S3); validate_trip(T3); trip_distance(T3); END
+validate_trip(T2)
+validate_trip(T1)
+BEGIN validate_trip(T2); create_trip(T3, trip2, S1, P1, S2, S3); validate_trip(T3); trip_distance(T3); END
+VIEW
+SAVE
+create_trip(T2, trip, S1, S2, P1, S3)
+reate_trip(T2, trip, S1, S2, P1, S3)
+create_path(P1, path, 1.0, S1, S2)
+create_path(P1, path, 1.0, S1, S2)create_path(P1, path, 1.0, S1, S2)
+trip_distance(T1)
+cleanup_trip(T1)
+trip_distance(T1)
+validate_trip(T1)
+create_trip(T1, trippy, S1, S2, S3)
+join_two_routes(R1, R2, R3, new_route)
+connect_route_stops_by_min_dist(R2)
+LOAD
+VIEW
+SAVE
+create_route(R2, interestinggg, create_stop(S5, Kalvarijos, 6.55, 6.66), create_stop(S6, Jeruzale, 7.55, 7.66), create_stop(S7, Zalieji_ezereliai, 8.55, 8.66))
+connect_route_stops_by_min_dist(R1)
+create_route(R1, imabouttodiefromhaskell, S1, S2, S3, S4)
+>>> create_route(R1, imabouttodiefromhaskell, S1, S2, S3, S4)
+>>> create_route(R1, imabouttodiefromhaskell, S1, S2, S3, S4)
+END
+create_stop(S4, Jovaro, 3.55, 3.66);
+create_stop(S3, Gelvonu, 2.55, 2.66);
+create_stop(S2, Gelvoneliu, 1.55, 1.66);
+create_stop(S1, Seskine, 0.55, 0.66);
+BEGIN
+:paste
+::paste
 END
 create_stop(S4, Jovaro, 3.55, 3.66);
 create_stop(S3, Gelvonu, 2.55, 2.66);

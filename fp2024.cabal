@@ -71,6 +71,7 @@ executable fp2024-four-client
       base >=4.7 && <5
     , bytestring
     , fp2024
+    , free
     , lens
     , repline
     , string-conversions

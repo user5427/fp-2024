@@ -30,6 +30,8 @@ dump = liftF $ Dump id
 save :: MyDomain ()
 save = liftF $ Save id
 
+-- >>> runIO program
+-- ("24","36")
 program :: MyDomain (String, String)
 program = do
     load
@@ -95,7 +97,7 @@ runIO p = do
             runIO' v next
         runStep :: IORef Int -> MyDomainAlgebra a -> IO a
         runStep v (Load next) = do
-            a <- S.readFile "./data"
+            a <- S.readFile "./data.txt"
             writeIORef v (read a)
             return $ next ()
         runStep v (Add i next) = do
@@ -107,5 +109,5 @@ runIO p = do
             return $ next $ show a
         runStep v (Save next) = do
             a <- readIORef v
-            writeFile "./data" (show a)
+            writeFile "./data.txt" (show a)
             return $ next ()

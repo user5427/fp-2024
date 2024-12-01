@@ -14,8 +14,8 @@ parse parser = runState (runExceptT parser)
 
 -- >>> parse (parseChar 'a') "aaaa"
 -- (Right 'a',"aaa")
--- >>> parse (parseChar 'a') ""
--- (Left "Empty input","")
+-- >>> parse (parseChar 'a') "123"
+-- (Left "a is not found","123")
 parseChar :: Char -> Parser Char
 parseChar a = do
     input <- lift get
@@ -25,6 +25,7 @@ parseChar a = do
             then lift $ put xs >> return x
             else
                 throwE $ a:" is not found"
+
 
 -- >>> parse parseTwoAs "a a"
 -- (Right (),"")

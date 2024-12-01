@@ -4,79 +4,89 @@ module Lib2
     ( Query(..),
     StopId(..), RouteId(..), PathId(..), Name(..), Point(..), QueryStopOrPath(..), QueryStopOrPathOrCreate(..), QueryStopOrCreatOrNextPrev(..),
     CoordX(..), CoordY(..), PathLenght(..), TripId(..), QueryTrip(..), QueryRoute(..),
-    Stop(..), Route(..), Path(..), Trip(..), NextStop(..), PreviousStop(..),
+    Stop(..), Route(..), Path(..), Trip(..), NextStop(..), PreviousStop(..), 
     parseQuery,
-    State(..),
+    MyState(..),
     emptyState,
     stateTransition,
     parseExact,
+    parse,
     ) where
 
 import qualified Data.Char as C
 import qualified Data.List as L
 import Data.Functor.Classes (eq1)
 import Data.List (delete)
+import Control.Monad.Trans.Except (ExceptT, throwE, runExceptT)
+import Control.Monad.Trans.Class(lift)
+import Control.Monad.IO.Class(liftIO)
+import Control.Monad.Trans.State.Strict (State, StateT, get, put, runState, runStateT)
+
+-- type Parser a = String -> Either String (a, String)
+type Parser2 a = ExceptT String (Control.Monad.Trans.State.Strict.State String) a
+parse :: Parser2 a -> String -> (Either String a, String)
+parse parser = runState (runExceptT parser)
 
 type Parser a = String -> Either String (a, String)
-many :: Parser a -> Parser [a]
+
+many :: Parser2 a -> Parser2 [a]
 many p = many' p []
     where
-        many' p' acc = \input ->
-            case p' input of
-                Left _ -> Right (acc, input)
-                Right (v, r) -> many' p' (acc ++ [v]) r
-and2 :: Parser a -> Parser b -> Parser (a, b)
-and2 a b = \input ->
-    case a input of
-        Right (v1, r1) ->
-            case b r1 of
-                Right (v2, r2) -> Right ((v1, v2), r2)
-                Left e2 -> Left e2
-        Left e1 -> Left e1
-and2' :: (a -> b -> c) -> Parser a -> Parser b -> Parser c
-and2' c a b = \input ->
-    case a input of
-        Right (v1, r1) ->
-            case b r1 of
-                Right (v2, r2) -> Right (c v1 v2, r2)
-                Left e2 -> Left e2
-        Left e1 -> Left e1
-and3' :: (a -> b -> c -> d) -> Parser a -> Parser b -> Parser c -> Parser d
-and3' f a b c = \input ->
-    case a input of
-        Right (v1, r1) ->
-            case b r1 of
-                Right (v2, r2) ->
-                    case c r2 of
-                        Right (v3, r3) -> Right (f v1 v2 v3, r3)
-                        Left e3 -> Left e3
-                Left e2 -> Left e2
-        Left e1 -> Left e1
-and5' :: (a -> b -> c -> d -> e -> f) -> Parser a -> Parser b -> Parser c -> Parser d -> Parser e -> Parser f
-and5' f a b c d e = \input ->
-    case a input of
-        Right (v1, r1) ->
-            case b r1 of
-                Right (v2, r2) ->
-                    case c r2 of
-                        Right (v3, r3) ->
-                            case d r3 of
-                                Right (v4, r4) ->
-                                    case e r4 of
-                                        Right (v5, r5) -> Right (f v1 v2 v3 v4 v5, r5)
-                                        Left e5 -> Left e5
-                                Left e4 -> Left e4
-                        Left e3 -> Left e3
-                Left e2 -> Left e2
-        Left e1 -> Left e1
-or2 :: Parser a -> Parser a -> Parser a
-or2 a b = \input ->
-    case a input of
-        Right r1 -> Right r1
-        Left e1 ->
-            case b input of
-                Right r2 -> Right r2
-                Left e2 -> Left (e1 ++ ", " ++ e2)
+        many' p' acc = do
+            input <- lift get
+            case parse p' input of
+                (Left _, rest') -> lift $ put rest' >> return (reverse acc)
+                (Right a, rest) -> do
+                    lift $ put rest
+                    many' p' (a:acc)
+
+parseManySeperated :: Parser2 a -> Parser2 b -> Parser2 [a]
+parseManySeperated p sep = do
+    a <- p
+    input <- lift get
+    case parse sep input of
+        (Left _, rest) -> lift $ put rest >> return [a]
+        (Right _, rest) -> do
+            lift $ put rest
+            as <- parseManySeperated p sep
+            return (a:as)
+
+
+and2 :: Parser2 a -> Parser2 b -> Parser2 (a, b)
+and2 p1 p2 = do
+    a <- p1
+    b <- p2
+    return (a, b)
+
+and2' :: (a -> b -> c) -> Parser2 a -> Parser2 b -> Parser2 c
+and2' f p1 p2 = do
+    a <- p1
+    b <- p2
+    return $ f a b
+
+and3' :: (a -> b -> c -> d) -> Parser2 a -> Parser2 b -> Parser2 c -> Parser2 d
+and3' f p1 p2 p3 = do
+    a <- p1
+    b <- p2
+    c <- p3
+    return $ f a b c
+
+and5' :: (a -> b -> c -> d -> e -> f) -> Parser2 a -> Parser2 b -> Parser2 c -> Parser2 d -> Parser2 e -> Parser2 f
+and5' f p1 p2 p3 p4 p5 = do
+    a <- p1
+    b <- p2
+    c <- p3
+    d <- p4
+    e <- p5
+    return $ f a b c d e
+
+or2 :: Parser2 a -> Parser2 a -> Parser2 a
+or2 p1 p2 = do
+    input <- lift get
+    case parse p1 input of
+        (Left _, _) -> p2
+        (Right _, _) -> p1
+
 getByExtractorFromArray :: Eq a => a -> (b -> a) -> [b] -> Either String b
 getByExtractorFromArray = getByIndexFromArray'
   where
@@ -186,563 +196,464 @@ instance Show Query where
       CheckIfRouteStopsConnected routeId -> "CheckIfRouteStopsConnected " ++ show routeId
       DistanceBetweenStops stopId1 stopId2 -> "DistanceBetweenStops " ++ show stopId1 ++ " " ++ show stopId2
       AssignStopToRoute stopId routeId -> "AssignStopToRoute " ++ show stopId ++ " " ++ show routeId
+      View -> "View"
 
 -- HELPER FUNCTIONS
-parseExact :: String -> Parser String
-parseExact expected input =
+-- >>> parseExact "a" "a"
+parseExact :: String -> Parser2 String
+parseExact expected = do
+  input <- lift get
   let len = length expected
-  in if take len input == expected
-       then Right (expected, drop len input)
-       else Left $ "Expected " ++ expected
+  if take (length expected) input == expected
+       then lift $ put (drop (len) input) >> return expected --Right (expected, drop len input)
+       else throwE $ "Expected " ++ expected
+
 -- HELPER FUNCTIONS
-checkIfStringIsInString :: String -> Parser (String, String)
-checkIfStringIsInString str [] = Left "Empty input, cannot parse a string"
-checkIfStringIsInString str input = parseExactInString' ([], str) input
-  where
-    parseExactInString' (_, _) []  = Left ("Cannot find " ++ str ++ " in the input")
-    parseExactInString' (acc, str') s@(h:t)  =
-        case parseExact str' s of
-          Right (v1, r1) -> Right ((acc, v1), r1)
-          Left _ -> parseExactInString' (acc ++ [h], str') t
--- HELPER FUNCTIONS
-parseChar :: Char -> Parser Char
-parseChar c [] = Left ("Cannot find " ++ [c] ++ " in an empty input")
-parseChar c s@(h:t) = if c == h then Right (c, t) else Left (c : " is not found in " ++ s)
+parseChar :: Char -> Parser2 Char
+parseChar c = do
+  input <- lift get
+  if null input
+    then throwE ("Cannot find " ++ [c] ++ " in an empty input")
+    else if c == head input
+      then lift $ put (tail input) >> return c
+      else throwE (c : " is not found in " ++ input)
 -- <character> ::= [1-9] | [A-Z] | [a-z] | "_"
-parseLetter :: Parser Char
-parseLetter [] = Left "Cannot find any letter in an empty input"
-parseLetter s@(h:t) = if C.isLetter h || h == '_' then Right (h, t) else Left (s ++ " does not start with a letter")
+parseLetter :: Parser2 Char
+parseLetter = do
+  input <- lift get
+  if null input
+    then throwE "Cannot find any letter in an empty input"
+    else if C.isLetter (head input) || head input == '_'
+      then lift $ put (tail input) >> return (head input)
+      else throwE (input ++ " does not start with a letter")
 -- HELPER FUNCTIONS
-parseDigit :: Parser Char
-parseDigit [] = Left "Cannot find any digits in an empty input"
-parseDigit s@(h:t) = if C.isDigit h then Right (h, t) else Left (s ++ " does not start with a digit")
+parseDigit :: Parser2 Char
+parseDigit = do
+  input <- lift get
+  if null input
+    then throwE "Cannot find any digits in an empty input"
+    else if C.isDigit (head input)
+      then lift $ put (tail input) >> return (head input)
+      else throwE (input ++ " does not start with a digit")
 -- <string> ::= <character> <string> | <character>
-parseString :: Parser String
-parseString = many (parseLetter `or2` parseDigit)
+parseString :: Parser2 String
+parseString = many (or2 parseLetter parseDigit)
 -- ", "
-parseSeperator :: Parser String
-parseSeperator input =
-      case parseExact ", " input of
-        Left e1 -> Left e1
-        Right(v2, r2) -> Right (v2, r2)
+parseSeperator :: Parser2 String
+parseSeperator = parseExact ", "
 -- "."
-parseDotSeperator :: Parser String
-parseDotSeperator input =
-  case parseExact "." input of
-    Left e1 -> Left e1
-    Right (v1, r1) -> Right (v1, r1)
+parseDotSeperator :: Parser2 String
+parseDotSeperator = parseExact "."
 -- <integer>
-parseInteger :: Parser Integer
-parseInteger [] = Left "empty input, cannot parse an integer"
-parseInteger input =
-    let
-        digits = L.takeWhile C.isDigit input
+parseInteger :: Parser2 Integer
+parseInteger = do
+  input <- lift get
+  if null input
+    then throwE "empty input, cannot parse an integer"
+    else
+      let
+        digits = takeWhile C.isDigit input
         rest = drop (length digits) input
-    in
-        case digits of
-            [] -> Left "not an integer"
-            _ -> Right (read digits, rest)
+      in
+        if null digits
+          then throwE "not an integer"
+          else lift $ put rest >> return (read digits)
 -- <pos>
-parsePositiveFloat :: Parser Float
-parsePositiveFloat [] = Left "empty input, cannot parse a float"
-parsePositiveFloat input =
-   let
-      integerPart = parseInteger input
-      rest = case integerPart of
-        Left e1 -> Left e1
-        Right (v1, r) ->
-          case parseDotSeperator r of
-            Left e2 -> Left e2
-            Right (_, r2) ->
-              case parseInteger r2 of
-                Left e3 -> Left e3
-                Right (v3, r3) -> Right ((v1, v3), r3)
-    in case rest of
-      Left _ ->
-        case integerPart of
-          Left e1 -> Left e1
-          Right (v1, r1) -> Right (fromIntegral v1, r1)
-      Right (v1, r1) -> Right (read (show (fst v1) ++ "." ++ show (snd v1)), r1)
+parsePositiveFloat :: Parser2 Float
+parsePositiveFloat = do
+    integerPart <- parseInteger
+    input <- lift get
+    case parse parseDotSeperator input of
+        (Left _, _) -> return (read (show integerPart))
+        (Right _, rest) -> do
+            case parse parseInteger rest of
+                (Left _, _) -> throwE "not an integer"
+                (Right decimalPart, rest') -> lift $ put rest' >> return (read (show integerPart ++ "." ++ show decimalPart))
 -- <float>
-parseFloat :: Parser Float
-parseFloat [] = Left "empty input, cannot parse a float"
-parseFloat input =
-  let
-    sign = parseChar '-' input
-  in
-    case sign of
-      Right (_, r1) ->
-        case parsePositiveFloat r1 of
-          Right (v2, r2) -> Right (-v2, r2)
-          Left e2 -> Left e2
-      Left _ ->
-        case parsePositiveFloat input of
-          Right (v2, r2) -> Right (v2, r2)
-          Left e2 -> Left e2
--- HELPER FUNCTIONS
-getStringFromParser :: Parser String -> Parser String
-getStringFromParser parser input =
-  let
-    result = parser input
-    in case result of
-      Left e1 -> Left e1
-      Right (v1, r1) -> Right (v1, r1)
+parseFloat :: Parser2 Float
+parseFloat = do
+    input <- lift get
+    case parse (parseExact "-") input of
+        (Left _, _) -> parsePositiveFloat
+        (Right _, rest) -> do
+            case parse parsePositiveFloat rest of
+                (Left _, _) -> throwE "not a float"
+                (Right numner, rest') -> lift $ put rest' >> return (-numner)
+                
 -- <trip_id> ::= "T" <integer>
 data TripId = TripId Char Int deriving (Show, Eq)
-parseTripId :: Parser TripId
-parseTripId [] = Left "empty input, cannot parse a trip id"
-parseTripId input =
-  let
-    typeChar = parseChar 'T' input
-    in case typeChar of
-      Left e1 -> Left e1
-      Right (v0, r1) ->
-        let
-          tripId = parseInteger r1
-          in case tripId of
-            Left e1 -> Left e1
-            Right (v1, r2) -> Right (TripId v0 (fromIntegral v1), r2)
+parseTripId :: Parser2 TripId
+parseTripId = do
+  _ <- parseChar 'T'
+  tripId <- parseInteger
+  return (TripId ('T') (fromIntegral tripId))
+
 -- <route_id> ::= <integer>
 data RouteId = RouteId Char Int deriving (Show, Eq)
-parseRouteId :: Parser RouteId
-parseRouteId [] = Left "empty input, cannot parse a route id"
-parseRouteId input =
-  let
-    typeChar = parseChar 'R' input
-    in case typeChar of
-      Left e1 -> Left e1
-      Right (v0, r1) ->
-        let
-          tripId = parseInteger r1
-          in case tripId of
-            Left e1 -> Left e1
-            Right (v1, r2) -> Right (RouteId v0 (fromIntegral v1), r2)
+parseRouteId :: Parser2 RouteId
+parseRouteId = do
+  _ <- parseChar 'R'
+  routeId <- parseInteger
+  return (RouteId ('R') (fromIntegral routeId))
+
 -- <stop_id> ::= <integer>
 data StopId = StopId Char Int deriving (Show, Eq)
-parseStopId :: Parser StopId
-parseStopId [] = Left "empty input, cannot parse a stop id"
-parseStopId input =
-  let
-    typeChar = parseChar 'S' input
-    in case typeChar of
-      Left e1 -> Left e1
-      Right (v0, r1) ->
-        let
-          tripId = parseInteger r1
-          in case tripId of
-            Left e1 -> Left e1
-            Right (v1, r2) -> Right (StopId v0 (fromIntegral v1), r2)
+parseStopId :: Parser2 StopId
+parseStopId = do
+  _ <- parseChar 'S'
+  stopId <- parseInteger
+  return (StopId ('S') (fromIntegral stopId))
+
 -- <list_of_stop_ids> ::= <stop_id> "," <list_of_stop_ids> | <stop_id>
-parseStopIdList :: Parser [StopId]
-parseStopIdList [] = Left "empty input, cannot parse a stop id list"
-parseStopIdList input = many' input []
-  where
-    many' [] acc = Right (acc, [])
-    many' input acc =
-      case parseStopId input of
-        Right (v1, r1) -> many' r1 (acc ++ [v1])
-        Left _ ->
-          case parseSeperator input of
-            Right (_, r1) -> many' r1 acc
-            Left e1 -> Right (acc, input)
+parseStopIdList :: Parser2 [StopId]
+parseStopIdList = parseManySeperated parseStopId parseSeperator
+
 -- <path_id> ::= <integer>
 data PathId = PathId Char Int deriving (Show, Eq)
-parsePathId :: Parser PathId
-parsePathId [] = Left "empty input, cannot parse a path id"
-parsePathId input =
-  let
-    typeChar = parseChar 'P' input
-    in case typeChar of
-      Left e1 -> Left e1
-      Right (v0, r1) ->
-        let
-          tripId = parseInteger r1
-          in case tripId of
-            Left e1 -> Left e1
-            Right (v1, r2) -> Right (PathId v0 (fromIntegral v1), r2)
+parsePathId :: Parser2 PathId
+parsePathId = do
+  _ <- parseChar 'P'
+  pathId <- parseInteger
+  return (PathId ('P') (fromIntegral pathId))
 -- <path_length> ::= <float>
 data PathLenght = PathLenght Float deriving (Show, Eq)
-parsePathLenght :: Parser PathLenght
-parsePathLenght [] = Left "empty input, cannot parse a path length"
-parsePathLenght input =
-  let
-    pathLenght = parseFloat input
-    in case pathLenght of
-      Left e1 -> Left e1
-      Right (v1, r1) -> Right (PathLenght v1, r1)
+parsePathLenght :: Parser2 PathLenght
+parsePathLenght = do
+  pathLenght <- parseFloat
+  return (PathLenght pathLenght)
 -- <coord_x> ::= <float>
 data CoordX = CoordX Float deriving (Show, Eq)
-parseCoordX :: Parser CoordX
-parseCoordX [] = Left "empty input, cannot parse a coord x"
-parseCoordX input =
-  let
-    coordX = parseFloat input
-    in case coordX of
-      Left e1 -> Left e1
-      Right (v1, r1) -> Right (CoordX v1, r1)
+parseCoordX :: Parser2 CoordX
+parseCoordX = do
+  coordX <- parseFloat
+  return (CoordX coordX)
 -- <coord_y> ::= <float>
 data CoordY = CoordY Float deriving (Show, Eq)
-parseCoordY :: Parser CoordY
-parseCoordY [] = Left "empty input, cannot parse a coord y"
-parseCoordY input =
-  let
-    coordY = parseFloat input
-    in case coordY of
-      Left e1 -> Left e1
-      Right (v1, r1) -> Right (CoordY v1, r1)
+parseCoordY :: Parser2 CoordY
+parseCoordY = do
+  coordY <- parseFloat
+  return (CoordY coordY)
 -- <point> ::= <coord_x> ", " <coord_y>
 data Point = Point CoordX CoordY deriving (Show, Eq)
-parsePoint :: Parser Point
-parsePoint = (and3' (\a _ b -> Point a b) parseCoordX (parseSeperator) parseCoordY)
+parsePoint :: Parser2 Point
+parsePoint = do
+  coordX <- parseCoordX
+  _ <- parseSeperator
+  coordY <- parseCoordY
+  return (Point coordX coordY)
 -- <name> ::= <string>
 data Name = Name String deriving (Show, Eq)
-parseName :: Parser Name
-parseName [] = Left "empty input, cannot parse a name"
-parseName input =
-  let
-    name = parseString input
-    in case name of
-      Left e1 -> Left e1
-      Right (v1, r1) -> Right (Name v1, r1)
+parseName :: Parser2 Name
+parseName = do
+  name <- parseString
+  return (Name name)
 -- <stop_or_path> ::= <stop_id> | <path_id>
 data QueryStopOrPath = StopId' StopId | PathId' PathId deriving (Show, Eq)
-parseQueryStopOrPath :: Parser QueryStopOrPath
-parseQueryStopOrPath input =
-  let
-    parseStop = parseStopId input
-    in case parseStop of
-      Right (v1, r1) -> Right (StopId' v1, r1)
-      Left _ ->
-        let
-          parsePath = parsePathId input
-          in case parsePath of
-            Right (v2, r2) -> Right (PathId' v2, r2)
-            Left e2 -> Left e2
+parseQueryStopOrPath :: Parser2 QueryStopOrPath
+parseQueryStopOrPath = do
+  input <- lift get
+  case parse parseStopId input of
+    (Right stopId, rest) -> do
+      lift $ put rest >> return (StopId' stopId)
+    (Left _, _) -> do
+      pathId <- parsePathId
+      return (PathId' pathId)
+
 -- + <list_of_stops_and_paths> ::= <stop_or_path> "," <list_of_stops_and_paths> | <stop_or_path> 
-parseQueryStopOrPathList :: Parser [QueryStopOrPath]
-parseQueryStopOrPathList input = many' input []
-  where
-    many' [] acc = Right (acc, [])
-    many' input acc =
-      case parseQueryStopOrPath input of
-        Right (v1, r1) -> many' r1 (acc ++ [v1])
-        Left _ ->
-          case parseSeperator input of
-            Right (_, r1) -> many' r1 acc
-            Left e1 -> Right (acc, input)
+parseQueryStopOrPathList :: Parser2 [QueryStopOrPath]
+parseQueryStopOrPathList = parseManySeperated parseQueryStopOrPath parseSeperator
 data QueryStopOrPathOrCreate = QueryStopOrPath' QueryStopOrPath | CreateStop' Query | FindNextStop' Query | FindPreviousStop' Query deriving (Show, Eq)
 -- <stop_or_path_or_creat> ::= <create_stop> | <stop_or_path> | <find_next_stop> | <find_previous_stop>
-parseQueryStopOrPathOrCreat :: Parser QueryStopOrPathOrCreate
-parseQueryStopOrPathOrCreat input = 
-  let 
-    res = parseQueryCreateStop input
-    in case res of
-      Right (r1, v1) -> Right (CreateStop' r1, v1)
-      Left _ -> 
-        let 
-          res' = parseQueryStopOrPath input
-          in case res' of
-            Right (r1, v1) -> Right (QueryStopOrPath' r1, v1)
-            Left e1 -> 
-              let res'' = parseQueryFindNextStop input
-              in case res'' of
-                Right (r1, v1) -> Right (FindNextStop' r1, v1)
-                Left e2 -> 
-                  let res''' = parseQueryFindPreviousStop input
-                  in case res''' of
-                    Right (r1, v1) -> Right (FindPreviousStop' r1, v1)
-                    Left e3 -> Left e3
+parseQueryStopOrPathOrCreat :: Parser2 QueryStopOrPathOrCreate
+parseQueryStopOrPathOrCreat = do
+  input <- lift get
+  case parse parseQueryCreateStop input of
+    (Right createStop', rest) -> do
+      lift $ put rest
+      return (CreateStop' createStop')
+    (Left _, _) -> do
+      case parse parseQueryStopOrPath input of
+        (Right stopOrPath', rest) -> do
+          lift $ put rest
+          return (QueryStopOrPath' stopOrPath')
+        (Left _, _) -> do
+          case parse parseQueryFindNextStop input of
+            (Right findNextStop', rest) -> do
+              lift $ put rest
+              return (FindNextStop' findNextStop')
+            (Left _, _) -> do
+              case parse parseQueryFindPreviousStop input of
+                (Right findPreviousStop', rest) -> do
+                  lift $ put rest
+                  return (FindPreviousStop' findPreviousStop')
+                (Left _, _) -> throwE "Cannot parse QueryStopOrPathOrCreate"
 -- <list_of_stops_paths_creat> ::= <stop_or_path_or_creat> "," <list_of_stops_paths_creat> | <stop_or_path_or_creat>
-parseQueryStopOrPathOrCreatList :: Parser [QueryStopOrPathOrCreate]
-parseQueryStopOrPathOrCreatList = and2' (:)
-                        parseQueryStopOrPathOrCreat
-                        (many (and2' (\_ b -> b) (parseSeperator) parseQueryStopOrPathOrCreat))
+parseQueryStopOrPathOrCreatList :: Parser2 [QueryStopOrPathOrCreate]
+parseQueryStopOrPathOrCreatList = parseManySeperated parseQueryStopOrPathOrCreat parseSeperator
 -- <stop_or_creat_or_nextprev> ::= <create_stop> | <stop_id> | <find_next_stop> | <find_previous_stop>
 data QueryStopOrCreatOrNextPrev = QueryStopOrCreatOrNextPrevStop StopId | QueryStopOrCreatOrNextPrevCreateStop Query | QueryStopOrCreatOrNextPrevFindNextStop Query | QueryStopOrCreatOrNextPrevFindPreviousStop Query deriving (Show, Eq)
-parseQueryStopOrCreatOrNextPrev :: Parser QueryStopOrCreatOrNextPrev
-parseQueryStopOrCreatOrNextPrev input = 
-  let 
-    res = parseQueryCreateStop input
-    in case res of
-      Right (r1, v1) -> Right (QueryStopOrCreatOrNextPrevCreateStop r1, v1)
-      Left _ -> 
-        let 
-          res' = parseStopId input
-          in case res' of
-            Right (r1, v1) -> Right (QueryStopOrCreatOrNextPrevStop r1, v1)
-            Left e1 -> 
-              let res'' = parseQueryFindNextStop input
-              in case res'' of
-                Right (r1, v1) -> Right (QueryStopOrCreatOrNextPrevFindNextStop r1, v1)
-                Left e2 -> 
-                  let res''' = parseQueryFindPreviousStop input
-                  in case res''' of
-                    Right (r1, v1) -> Right (QueryStopOrCreatOrNextPrevFindPreviousStop r1, v1)
-                    Left e3 -> Left e3
+parseQueryStopOrCreatOrNextPrev :: Parser2 QueryStopOrCreatOrNextPrev
+parseQueryStopOrCreatOrNextPrev = do
+  input <- lift get
+  case parse parseQueryCreateStop input of
+    (Right createStop', rest) -> do
+      lift $ put rest
+      return (QueryStopOrCreatOrNextPrevCreateStop createStop')
+    (Left _, _) -> do
+      case parse parseStopId input of
+        (Right stopId, rest) -> do
+          lift $ put rest
+          return (QueryStopOrCreatOrNextPrevStop stopId)
+        (Left _, _) -> do
+          case parse parseQueryFindNextStop input of
+            (Right findNextStop', rest) -> do
+              lift $ put rest
+              return (QueryStopOrCreatOrNextPrevFindNextStop findNextStop')
+            (Left _, _) -> do
+              case parse parseQueryFindPreviousStop input of
+                (Right findPreviousStop', rest) -> do
+                  lift $ put rest
+                  return (QueryStopOrCreatOrNextPrevFindPreviousStop findPreviousStop')
+                (Left _, _) -> throwE "Cannot parse QueryStopOrCreatOrNextPrev"
+
 
 -- <list_of_stop_or_creat_or_nextprev> ::= <stop_or_creat_or_nextprev> ", " <list_of_stop_or_creat_or_nextprev> | <stop_or_creat_or_nextprev>
-parseQueryStopOrCreatOrNextPrevList :: Parser [QueryStopOrCreatOrNextPrev]
-parseQueryStopOrCreatOrNextPrevList = and2' (:)
-                        parseQueryStopOrCreatOrNextPrev
-                        (many (and2' (\_ b -> b) (parseSeperator) parseQueryStopOrCreatOrNextPrev))
+
+parseQueryStopOrCreatOrNextPrevList :: Parser2 [QueryStopOrCreatOrNextPrev]
+parseQueryStopOrCreatOrNextPrevList = parseManySeperated parseQueryStopOrCreatOrNextPrev parseSeperator
 -- <trip> ::= <trip_id> | <create_trip>
 data QueryTrip = Trip' TripId | CreateTrip' Query deriving (Show, Eq)
-parseQueryTrip :: Parser QueryTrip
-parseQueryTrip input =
-  let
-    res = parseTripId input
-    in case res of
-      Right (r1, v1) -> Right (Trip' r1, v1)
-      Left e1 -> 
-        let res' = parseQueryCreateTrip input
-        in case res' of
-          Right (r1, v1) -> Right (CreateTrip' r1, v1)
-          Left e2 -> Left e2
+parseQueryTrip :: Parser2 QueryTrip
+parseQueryTrip = do
+  input <- lift get
+  case parse parseTripId input of
+    (Right tripId, rest) -> do
+      lift $ put rest
+      return (Trip' tripId)
+    (Left _, _) -> do
+      createTrip <- parseQueryCreateTrip
+      return (CreateTrip' createTrip)
 -- <route> ::= <route_id> | <create_route> | <join_two_routes> | <join_two_routes_at_stop> -- Route
 data QueryRoute = Route' RouteId | CreateRoute' Query | JoinTwoRoutes' Query | JoinTwoRoutesAtStop' Query deriving (Show, Eq)
-parseQueryRoute :: Parser QueryRoute
-parseQueryRoute input =
-  let
-    res = parseRouteId input
-    in case res of
-      Right (r1, v1) -> Right (Route' r1, v1)
-      Left e1 -> 
-        let res' = parseQueryCreateRoute input
-        in case res' of
-          Right (r1, v1) -> Right (CreateRoute' r1, v1)
-          Left e2 -> 
-            let res'' = parseQueryJoinTwoRouter input
-            in case res'' of
-              Right (r1, v1) -> Right (JoinTwoRoutes' r1, v1)
-              Left e3 -> 
-                let res''' = parseQueryJoinTwoRouterAtStop input
-                in case res''' of
-                  Right (r1, v1) -> Right (JoinTwoRoutesAtStop' r1, v1)
-                  Left e4 -> Left e4
+parseQueryRoute :: Parser2 QueryRoute
+parseQueryRoute = do
+  input <- lift get
+  case parse parseRouteId input of
+    (Right routeId, rest) -> do
+      lift $ put rest
+      return (Route' routeId)
+    (Left _, _) -> do
+      case parse parseQueryCreateRoute input of
+        (Right createRoute, rest) -> do
+          lift $ put rest
+          return (CreateRoute' createRoute)
+        (Left _, _) -> do
+          case parse parseQueryJoinTwoRouter input of
+            (Right joinTwoRoutes, rest) -> do
+              lift $ put rest
+              return (JoinTwoRoutes' joinTwoRoutes)
+            (Left _, _) -> do
+              case parse parseQueryJoinTwoRouterAtStop input of
+                (Right joinTwoRoutesAtStop, rest) -> do
+                  lift $ put rest
+                  return (JoinTwoRoutesAtStop' joinTwoRoutesAtStop)
+                (Left _, _) -> throwE "Cannot parse QueryRoute"
 --
 --  | Functions
 -- \ /
 -- <create_stop> ::= "create_stop(" <stop_id> ", " <name> ", " <point> ")"
-parseQueryCreateStop :: Parser Query
-parseQueryCreateStop input =
-  let
-    res = and3' (\a b c -> CreateStop a b c)
-          (and3' (\_ b _ -> b) (parseExact "create_stop(") parseStopId parseSeperator)
-          parseName
-          (and3' (\_ c _ -> c) parseSeperator parsePoint (parseExact ")")) input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
+parseQueryCreateStop :: Parser2 Query
+parseQueryCreateStop = do
+  _ <- parseExact "create_stop("
+  stopId <- parseStopId
+  _ <- parseSeperator
+  name <- parseName
+  _ <- parseSeperator
+  point <- parsePoint
+  _ <- parseExact ")"
+  return (CreateStop stopId name point)
 
-parseQueryViewState :: Parser Query
-parseQueryViewState input =
-  let
-    res = parseExact "VIEW" input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (View, v1)
+parseQueryViewState :: Parser2 Query
+parseQueryViewState = do
+  _ <- parseExact "VIEW"
+  return View
 -- <create_route> ::= "create_route(" <route_id> ", " <name> ", " <list_of_stop_ids> ")"
-parseQueryCreateRoute :: Parser Query
-parseQueryCreateRoute input =
-  let
-    res = and3' (\a b c -> CreateRoute a b c)
-          (and3' (\_ b _ -> b) (parseExact "create_route(") parseRouteId parseSeperator)
-          parseName
-          (and3' (\_ c _ -> c) parseSeperator (parseQueryStopOrCreatOrNextPrevList) (parseExact ")")) input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
+parseQueryCreateRoute :: Parser2 Query
+parseQueryCreateRoute = do
+  _ <- parseExact "create_route("
+  routeId <- parseRouteId
+  _ <- parseSeperator
+  name <- parseName
+  _ <- parseSeperator
+  stopIds <- parseQueryStopOrCreatOrNextPrevList
+  _ <- parseExact ")"
+  return (CreateRoute routeId name stopIds)
 -- <create_path> ::= "create_path(" <path_id> ", " <name> ", " <path_length> ", " <stop_id> ", " <stop_id> ")"
-parseQueryCreatePath :: Parser Query
-parseQueryCreatePath input =
-  let
-    res = and5' (\a b c d e -> CreatePath a b c d e)
-          (and3' (\_ b _ -> b) (parseExact "create_path(") parsePathId parseSeperator)
-          parseName
-          (and2' (\_ c -> c) parseSeperator parsePathLenght)
-          (and2' (\_ d -> d) parseSeperator parseStopId)
-          (and3' (\_ e _ -> e) parseSeperator parseStopId (parseExact ")")) input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
+parseQueryCreatePath :: Parser2 Query
+parseQueryCreatePath = do
+  _ <- parseExact "create_path("
+  pathId <- parsePathId
+  _ <- parseSeperator
+  name <- parseName
+  _ <- parseSeperator
+  pathLenght <- parsePathLenght
+  _ <- parseSeperator
+  stopId1 <- parseStopId
+  _ <- parseSeperator
+  stopId2 <- parseStopId
+  _ <- parseExact ")"
+  return (CreatePath pathId name pathLenght stopId1 stopId2)
 -- <create_trip> ::= "create_trip(" <trip_id> ", " <name> ", " <list_of_stops_paths_creat> ")"
-parseQueryCreateTrip :: Parser Query
-parseQueryCreateTrip input =
-  let
-    res = and3' (\a b c -> CreateTrip a b c)
-          (and3' (\_ b _ -> b) (parseExact "create_trip(") parseTripId parseSeperator)
-          parseName
-          (and3' (\_ c _ -> c) parseSeperator (parseQueryStopOrPathOrCreatList) (parseExact ")")) input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <find_next_stop> ::= "find_next_stop(" <stop_id> ", " <route_id> ")"
-parseQueryFindNextStop :: Parser Query
-parseQueryFindNextStop input =
-  let
-    res = and3' (\_ a b -> FindNextStop a b)
-          (parseExact "find_next_stop(")
-          parseStopId
-          (and3' (\_ c _ -> c) parseSeperator parseRouteId (parseExact ")")) input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <find_previous_stop> ::= "find_previous_stop(" <stop_id> ", " <route_id> ")"
-parseQueryFindPreviousStop :: Parser Query
-parseQueryFindPreviousStop input =
-  let
-    res = and3' (\_ a b -> FindPreviousStop a b)
-          (parseExact "find_previous_stop(")
-          parseStopId
-          (and3' (\_ c _ -> c) parseSeperator parseRouteId (parseExact ")")) input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <set_next_stop> ::= "set_next_stop(" <stop_id> ", " <route_id> ", " <next_stop_id> ")"
-parseQuerySetNextStop :: Parser Query
-parseQuerySetNextStop input =
-  let
-    res = and3' (\c a b -> SetNextStop c a b)
-          (and3' (\_ a _ -> a) (parseExact "set_next_stop(") parseStopId parseSeperator)
-          (and2' (\c _ -> c) parseRouteId parseSeperator)
-          (and2' (\d _ -> d) parseStopId (parseExact ")")) input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <set_previous_stop> ::= "set_previous_stop(" <stop_id> ", " <route_id> ", " <previous_stop_id> ")"
-parseQuerySetPreviousStop :: Parser Query
-parseQuerySetPreviousStop input =
-  let
-    res = and3' (\c a b -> SetPreviousStop c a b)
-          (and3' (\_ a _ -> a) (parseExact "set_previous_stop(") parseStopId parseSeperator)
-          (and2' (\c _ -> c) parseRouteId parseSeperator)
-          (and2' (\d _ -> d) parseStopId (parseExact ")")) input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <join_two_trips> ::= "join_two_trips(" <trip> ", " <trip> ", " <new_trip_id> ", " <new_name> ")"
-parseQueryJoinTwoTrips :: Parser Query
-parseQueryJoinTwoTrips input =
-  let
-    res = and5' (\_ a b c d -> JoinTwoTrips a b c d)
-          (parseExact "join_two_trips(")
-          parseQueryTrip
-          (and3' (\_ b _ -> b) parseSeperator parseQueryTrip parseSeperator)
-          parseTripId
-          (and3' (\_ c _ -> c) parseSeperator parseName (parseExact ")")) input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <assign_stop_to_route> ::= "assign_stop_to_route(" <stopId> ", " <route_id ")"
-parseQueryAssignStopToRoute :: Parser Query
-parseQueryAssignStopToRoute input =
-  let
-    res = and3' (\a b _ -> AssignStopToRoute a b)
-          (and3' (\_ b _ -> b) (parseExact "assign_stop_to_route(") parseStopId parseSeperator)
-          parseRouteId
-          (parseExact ")") input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <distance_between_stops> ::= "distance_between_stops(" <stop_id> ", " <stop_id> ")"
-parseQueryDistanceBetweenStops :: Parser Query
-parseQueryDistanceBetweenStops input =
-  let
-    res = and3' (\_ a b -> DistanceBetweenStops a b)
-          (parseExact "distance_between_stops(")
-          parseStopId
-          (and3' (\_ c _ -> c) parseSeperator parseStopId (parseExact ")")) input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <check_if_route_stops_connected> ::= "check_if_route_stops_connected(" <route_id> ")"
-parseQueryCheckIfRouteStopsConnected :: Parser Query
-parseQueryCheckIfRouteStopsConnected input =
-  let
-    res = and3' (\_ a _ -> CheckIfRouteStopsConnected a)
-          (parseExact "check_if_route_stops_connected(")
-          parseRouteId
-          (parseExact ")") input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <connect_route_stops_by_min_dist> ::= "connect_route_stops_by_min_dist(" <route_id> ")"
-parseQueryConnectRouteStopsByMinDistance :: Parser Query
-parseQueryConnectRouteStopsByMinDistance input =
-  let
-    res = and3' (\_ a _ -> ConnectRouteStopsByMinDistance a)
-          (parseExact "connect_route_stops_by_min_dist(")
-          parseRouteId
-          (parseExact ")") input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <trip_distance> ::= "trip_distance(" <trip> ")"
-parseQueryTripDistance :: Parser Query
-parseQueryTripDistance input =
-  let
-    res = and3' (\_ a _ -> TripDistance a)
-          (parseExact "trip_distance(")
-          parseQueryTrip
-          (parseExact ")") input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <validate_trip> ::= "validate_trip(" <trip> ")"
-parseQueryValidateTrip :: Parser Query
-parseQueryValidateTrip input =
-  let
-    res = and3' (\_ a _ -> ValidateTrip a)
-          (parseExact "validate_trip(")
-          parseQueryTrip
-          (parseExact ")") input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <cleanup_trip> ::= "cleanup_trip(" <trip> ")"
-parseQueryCleanupTrip :: Parser Query
-parseQueryCleanupTrip input =
-  let
-    res = and3' (\_ a _ -> CleanupTrip a)
-          (parseExact "cleanup_trip(")
-          parseQueryTrip
-          (parseExact ")") input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <join_two_routes> ::= "join_two_routes(" <route> ", " <route> ", " <new_route_id> ", " <new_name> ")"
-parseQueryJoinTwoRouter :: Parser Query
-parseQueryJoinTwoRouter input =
-  let
-    res = and5' (\_ a b c d -> JoinTwoRoutes a b c d)
-          (parseExact "join_two_routes(")
-          parseQueryRoute
-          (and3' (\_ b _ -> b) parseSeperator parseQueryRoute parseSeperator)
-          parseRouteId
-          (and3' (\_ c _ -> c) parseSeperator parseName (parseExact ")")) input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
--- <join_two_routes_at_stop> ::= "join_two_routes_at_stop(" <route> ", " <route> ", " <stop_or_creat_or_nextprev> ", " <new_route_id> ", " <new_name> ")"
-parseQueryJoinTwoRouterAtStop :: Parser Query
-parseQueryJoinTwoRouterAtStop input =
-  let
-    res = and5' (\a b c d e -> JoinTwoRoutesAtStop a b c d e)
-          (and2' (\_ a -> a) (parseExact "join_two_routes_at_stop(") parseQueryRoute)
-          (and2' (\_ b -> b) parseSeperator parseQueryRoute)
-          (and3' (\_ c _ -> c) parseSeperator parseQueryStopOrCreatOrNextPrev parseSeperator)
-          parseRouteId
-          (and3' (\_ c _ -> c) parseSeperator parseName (parseExact ")")) input
-    in case res of
-      Left e1 -> Left e1
-      Right (r1, v1) -> Right (r1, v1)
+parseQueryCreateTrip :: Parser2 Query
+parseQueryCreateTrip = do
+  _ <- parseExact "create_trip("
+  tripId <- parseTripId
+  _ <- parseSeperator
+  name <- parseName
+  _ <- parseSeperator
+  stops <- parseQueryStopOrPathOrCreatList
+  _ <- parseExact ")"
+  return (CreateTrip tripId name stops)
 
+-- <find_next_stop> ::= "find_next_stop(" <stop_id> ", " <route_id> ")"
+parseQueryFindNextStop :: Parser2 Query
+parseQueryFindNextStop = do
+  _ <- parseExact "find_next_stop("
+  stopId <- parseStopId
+  _ <- parseSeperator
+  routeId <- parseRouteId
+  _ <- parseExact ")"
+  return (FindNextStop stopId routeId)
+-- <find_previous_stop> ::= "find_previous_stop(" <stop_id> ", " <route_id> ")"
+parseQueryFindPreviousStop :: Parser2 Query
+parseQueryFindPreviousStop = do
+  _ <- parseExact "find_previous_stop("
+  stopId <- parseStopId
+  _ <- parseSeperator
+  routeId <- parseRouteId
+  _ <- parseExact ")"
+  return (FindPreviousStop stopId routeId)
+-- <set_next_stop> ::= "set_next_stop(" <stop_id> ", " <route_id> ", " <next_stop_id> ")"
+parseQuerySetNextStop :: Parser2 Query
+parseQuerySetNextStop = do
+  _ <- parseExact "set_next_stop("
+  stopId <- parseStopId
+  _ <- parseSeperator
+  routeId <- parseRouteId
+  _ <- parseSeperator
+  nextStopId <- parseStopId
+  _ <- parseExact ")"
+  return (SetNextStop stopId routeId nextStopId)
+-- <set_previous_stop> ::= "set_previous_stop(" <stop_id> ", " <route_id> ", " <previous_stop_id> ")"
+parseQuerySetPreviousStop :: Parser2 Query
+parseQuerySetPreviousStop = do
+  _ <- parseExact "set_previous_stop("
+  stopId <- parseStopId
+  _ <- parseSeperator
+  routeId <- parseRouteId
+  _ <- parseSeperator
+  previousStopId <- parseStopId
+  _ <- parseExact ")"
+  return (SetPreviousStop stopId routeId previousStopId)
+-- <join_two_trips> ::= "join_two_trips(" <trip> ", " <trip> ", " <new_trip_id> ", " <new_name> ")"
+parseQueryJoinTwoTrips :: Parser2 Query
+parseQueryJoinTwoTrips = do
+  _ <- parseExact "join_two_trips("
+  trip1 <- parseQueryTrip
+  _ <- parseSeperator
+  trip2 <- parseQueryTrip
+  _ <- parseSeperator
+  newTripId <- parseTripId
+  _ <- parseSeperator
+  newName <- parseName
+  _ <- parseExact ")"
+  return (JoinTwoTrips trip1 trip2 newTripId newName)
+-- <assign_stop_to_route> ::= "assign_stop_to_route(" <stopId> ", " <route_id ")"
+parseQueryAssignStopToRoute :: Parser2 Query
+parseQueryAssignStopToRoute = do
+  _ <- parseExact "assign_stop_to_route("
+  stopId <- parseStopId
+  _ <- parseSeperator
+  routeId <- parseRouteId
+  _ <- parseExact ")"
+  return (AssignStopToRoute stopId routeId)
+-- <distance_between_stops> ::= "distance_between_stops(" <stop_id> ", " <stop_id> ")"
+parseQueryDistanceBetweenStops :: Parser2 Query
+parseQueryDistanceBetweenStops = do
+  _ <- parseExact "distance_between_stops("
+  stopId1 <- parseStopId
+  _ <- parseSeperator
+  stopId2 <- parseStopId
+  _ <- parseExact ")"
+  return (DistanceBetweenStops stopId1 stopId2)
+-- <check_if_route_stops_connected> ::= "check_if_route_stops_connected(" <route_id> ")"
+parseQueryCheckIfRouteStopsConnected :: Parser2 Query
+parseQueryCheckIfRouteStopsConnected = do
+  _ <- parseExact "check_if_route_stops_connected("
+  routeId <- parseRouteId
+  _ <- parseExact ")"
+  return (CheckIfRouteStopsConnected routeId)
+-- <connect_route_stops_by_min_dist> ::= "connect_route_stops_by_min_dist(" <route_id> ")"
+parseQueryConnectRouteStopsByMinDistance :: Parser2 Query
+parseQueryConnectRouteStopsByMinDistance = do
+  _ <- parseExact "connect_route_stops_by_min_dist("
+  routeId <- parseRouteId
+  _ <- parseExact ")"
+  return (ConnectRouteStopsByMinDistance routeId)
+-- <trip_distance> ::= "trip_distance(" <trip> ")"
+parseQueryTripDistance :: Parser2 Query
+parseQueryTripDistance = do
+  _ <- parseExact "trip_distance("
+  trip <- parseQueryTrip
+  _ <- parseExact ")"
+  return (TripDistance trip)
+-- <validate_trip> ::= "validate_trip(" <trip> ")"
+parseQueryValidateTrip :: Parser2 Query
+parseQueryValidateTrip = do
+  _ <- parseExact "validate_trip("
+  trip <- parseQueryTrip
+  _ <- parseExact ")"
+  return (ValidateTrip trip)
+-- <cleanup_trip> ::= "cleanup_trip(" <trip> ")"
+parseQueryCleanupTrip :: Parser2 Query
+parseQueryCleanupTrip = do
+  _ <- parseExact "cleanup_trip("
+  trip <- parseQueryTrip
+  _ <- parseExact ")"
+  return (CleanupTrip trip)
+-- <join_two_routes> ::= "join_two_routes(" <route> ", " <route> ", " <new_route_id> ", " <new_name> ")"
+parseQueryJoinTwoRouter :: Parser2 Query
+parseQueryJoinTwoRouter = do
+  _ <- parseExact "join_two_routes("
+  route1 <- parseQueryRoute
+  _ <- parseSeperator
+  route2 <- parseQueryRoute
+  _ <- parseSeperator
+  newRouteId <- parseRouteId
+  _ <- parseSeperator
+  newName <- parseName
+  _ <- parseExact ")"
+  return (JoinTwoRoutes route1 route2 newRouteId newName)
+-- <join_two_routes_at_stop> ::= "join_two_routes_at_stop(" <route> ", " <route> ", " <stop_or_creat_or_nextprev> ", " <new_route_id> ", " <new_name> ")"
+parseQueryJoinTwoRouterAtStop :: Parser2 Query
+parseQueryJoinTwoRouterAtStop = do
+  _ <- parseExact "join_two_routes_at_stop("
+  route1 <- parseQueryRoute
+  _ <- parseSeperator
+  route2 <- parseQueryRoute
+  _ <- parseSeperator
+  stopOrCreatOrNextPrev <- parseQueryStopOrCreatOrNextPrev
+  _ <- parseSeperator
+  newRouteId <- parseRouteId
+  _ <- parseSeperator
+  newName <- parseName
+  _ <- parseExact ")"
+  return (JoinTwoRoutesAtStop route1 route2 stopOrCreatOrNextPrev newRouteId newName)
 
 -- | Parses user's input.
 -- The function must have tests.
 parseQuery :: String -> Either String (Query, String)
-parseQuery [] = Left "Empty input is not a valid query"
-parseQuery input =
+parseQuery input = do
   let
     res = (parseQueryCreateStop `or2` parseQueryCreateRoute 
       `or2` parseQueryCreatePath `or2` parseQueryCreateTrip 
@@ -753,10 +664,12 @@ parseQuery input =
                 `or2` parseQuerySetNextStop `or2` parseQuerySetPreviousStop 
                   `or2` parseQueryConnectRouteStopsByMinDistance `or2` parseQueryCheckIfRouteStopsConnected 
                     `or2` parseQueryDistanceBetweenStops `or2` parseQueryAssignStopToRoute
-                      `or2` parseQueryViewState) input
-    in case res of
-      Left e1 -> Left "Unrecognized query format" -- e1
-      Right (r1, v1) -> Right (r1, v1)
+                      `or2` parseQueryViewState)
+    
+    in case parse res input of
+      (Left e1, _) -> Left "Unrecognized query format" 
+      (Right r1, v1) -> Right (r1, v1)
+
         
 
 addStopIdToRoute :: StopId -> Route -> Either String Route
@@ -890,7 +803,7 @@ data NextStop = NextStop StopId RouteId deriving (Show, Eq)
 data PreviousStop = PreviousStop StopId RouteId deriving (Show, Eq)
 data Stop = Stop StopId Name Point [NextStop] [PreviousStop] [RouteId] deriving (Show, Eq)
 -- <create_stop> ::= "create_stop(" <stop_id> ", " <name> ", " <point> ")"
-createStop :: State -> Query -> Either String (Stop, State)
+createStop :: MyState -> Query -> Either String (Stop, MyState)
 createStop state' query' =
   case query' of 
     (CreateStop stopId name point) -> 
@@ -908,7 +821,7 @@ createStop state' query' =
     _ -> Left "Not a create stop query"
 -- <create_route> ::= "create_route(" <route_id> ", " <name> ", " <list_of_stop_ids> ")"
 data Route = Route RouteId Name [StopId] deriving (Show, Eq)
-createRoute :: State -> Query -> Either String (Route, State)
+createRoute :: MyState -> Query -> Either String (Route, MyState)
 createRoute state query' =
   case query' of
     (CreateRoute routeId name stopIds) ->
@@ -947,7 +860,7 @@ createRoute state query' =
     _ -> Left "Not a create route query"
 -- <create_trip> ::= "create_trip(" <trip_id> ", " <name> ", " <list_of_stops_paths_creat> ")"
 data Trip = Trip TripId Name [QueryStopOrPath] deriving (Show, Eq)
-createTrip :: State -> Query -> Either String (Trip, State)
+createTrip :: MyState -> Query -> Either String (Trip, MyState)
 createTrip state query' =
   case query' of
     (CreateTrip tripId name stopOrPathList) ->
@@ -971,7 +884,7 @@ createTrip state query' =
     _ -> Left "Not a create trip query"
 -- <create_path> ::= "create_path(" <path_id> ", " <name> ", " <path_length> ", " <stop_id> ", " <stop_id> ")"
 data Path = Path PathId Name PathLenght StopId StopId deriving (Show, Eq)
-createPath :: State -> Query -> Either String (Path, State)
+createPath :: MyState -> Query -> Either String (Path, MyState)
 createPath state query' =
   case query' of
     (CreatePath pathId name pathLenght stopId1 stopId2) ->
@@ -998,7 +911,7 @@ createPath state query' =
                             Right foundStop2 -> Right (path, newState)
     _ -> Left "Not a create path query"
 -- <assign_stop_to_route> ::= "assign_stop_to_route(" <stopId> ", " <route_id ")"
-assignStopToRoute :: State -> Query -> Either String (Stop, State)
+assignStopToRoute :: MyState -> Query -> Either String (Stop, MyState)
 assignStopToRoute state query' =
   case query' of
     (AssignStopToRoute stopId routeId) ->
@@ -1036,7 +949,7 @@ assignStopToRouteData stop routeId =
       Nothing -> Right( Stop sid name point nextStops prevStops (routeId : routes'))
       Just _ -> Left "Stop already belongs to the route"
 -- <distance_between_stops> ::= "distance_between_stops(" <stop_id> ", " <stop_id> ")"
-distanceBetweenStops :: State -> Query -> Either String (Float, State)
+distanceBetweenStops :: MyState -> Query -> Either String (Float, MyState)
 distanceBetweenStops state query' =
   case query' of
     (DistanceBetweenStops stopId1 stopId2) ->
@@ -1059,7 +972,7 @@ distanceBetweenStops state query' =
 -- check if the stops are not the same
 -- check if the stops are not already connected
 -- check if the distance is not 0
-setNextStop :: State -> Query -> Either String State
+setNextStop :: MyState -> Query -> Either String MyState
 setNextStop state query' =
   case query' of
     (SetNextStop stopId routeId nextStopId) ->
@@ -1108,7 +1021,7 @@ parseSetNextStopData stop routeId nextStop' =
                           Right (Stop sid name point (NextStop nextStopId routeId : nextStops) prevStops routes')
 -- <set_previous_stop> ::= "set_previous_stop(" <stop_id> ", " <route_id> ", " <previous_stop_id> ")"
 -- same for previous stop
-setPreviousStop :: State -> Query -> Either String State
+setPreviousStop :: MyState -> Query -> Either String MyState
 setPreviousStop state query' =
   case query' of
     (SetPreviousStop stopId routeId previousStopId) ->
@@ -1156,7 +1069,7 @@ parseSetPreviousStopData stop routeId previousStop' =
                         in if distance == 0 then Left "Distance between stops is 0" else
                           Right (Stop sid name point nextStops (PreviousStop previousStopId routeId : prevStops) routes')
 -- <find_next_stop> ::= "find_next_stop(" <stop_id> ", " <route> ")"
-findNextStop :: State -> Query -> Either String (StopId, State)
+findNextStop :: MyState -> Query -> Either String (StopId, MyState)
 findNextStop state query' =
   case query' of
     (FindNextStop stopId routeId) ->
@@ -1186,7 +1099,7 @@ findNextStopData stopId routeId stops' =
               Nothing -> Left "Next stop not found"
               Just (NextStop nextStopId _) -> Right nextStopId
 -- <find_previous_stop> ::= "find_previous_stop(" <stop_id> ", " <route> ")"
-findPreviousStop :: State -> Query -> Either String (StopId, State)
+findPreviousStop :: MyState -> Query -> Either String (StopId, MyState)
 findPreviousStop state query' =
   case query' of
     (FindPreviousStop stopId routeId) ->
@@ -1216,7 +1129,7 @@ findPreviousStopData stopId routeId stops' =
               Nothing -> Left "Previous stop not found"
               Just (PreviousStop previousStopId _) -> Right previousStopId
 -- <connect_route_stops_by_min_dist> ::= "connect_route_stops_by_min_dist(" <route_id> ")"
-connectRouteStopsByMinDist :: State -> Query -> Either String State
+connectRouteStopsByMinDist :: MyState -> Query -> Either String MyState
 connectRouteStopsByMinDist state query' =
   case query' of
     (ConnectRouteStopsByMinDistance routeId) ->
@@ -1274,7 +1187,7 @@ connectStopsByMinDistData (stop:rest) route' =
                         Left e3 -> Left e3
                         Right newPrevStop' -> connectStopsByMinDist' newPrevStop' closestStop' t (acc ++ [newPrevStop'])
 -- <check_if_route_stops_connected> ::= "check_if_route_stops_connected(" <route_id> ")" -- atleast n-1 previous connections and n-1 next connections
-checkIfRouteStopsConnected :: State -> Query -> Either String (Bool, State)
+checkIfRouteStopsConnected :: MyState -> Query -> Either String (Bool, MyState)
 checkIfRouteStopsConnected state query' =
   case query' of
     (CheckIfRouteStopsConnected routeId) ->
@@ -1334,7 +1247,7 @@ checkIfRouteStopsConnectedData (h':t') rid' = checkConnection' (h':t') 0 0 rid' 
                             then checkConnection' t (prevCount + 1) nextCount rid (index+1)
                             else checkConnection' t prevCount nextCount rid (index+1)
 -- <validate_trip> ::= "validate_trip(" <trip> ")" -- all stops and paths are connected
-validateTrip :: State -> Query -> Either String (Bool, State)
+validateTrip :: MyState -> Query -> Either String (Bool, MyState)
 validateTrip state query' =
   case query' of
     (ValidateTrip tripId) ->
@@ -1410,7 +1323,7 @@ validateTripData input = validateTripData' input
               then validateForwardsData h t
               else Left "Trip stops or paths are not connected"
 -- <cleanup_trip> ::= "cleanup_trip(" <trip> ")"
-cleanupTrip :: State -> Query -> Either String State
+cleanupTrip :: MyState -> Query -> Either String MyState
 cleanupTrip state query' =
   case query' of
     (CleanupTrip tripId) -> -- FIXME
@@ -1456,7 +1369,7 @@ cleanupTripData input = cleanUpTripData input []
           Left e1 -> Right acc
           Right _ -> cleanUpTripData t (acc ++ [h])
 -- <trip_distance> ::= "trip_distance(" <trip> ")" -- sum of path lengths and distances between stop poitntssnsns
-tripDistance :: State -> Query -> Either String (Float, State)
+tripDistance :: MyState -> Query -> Either String (Float, MyState)
 tripDistance state query' =
   case query' of
     (TripDistance tripId) ->
@@ -1517,7 +1430,7 @@ tripDistanceData input =
           Right distance' -> tripDistanceData' t (acc + distance')
 
 -- <join_two_routes> ::= "join_two_routes(" <route> ", " <route> ", " <new_route_id> ", " <new_name> ")"
-joinTwoRoutes :: State -> Query -> Either String (Route, State)
+joinTwoRoutes :: MyState -> Query -> Either String (Route, MyState)
 joinTwoRoutes state query' =
   case query' of
     (JoinTwoRoutes route1 route2 newRouteId newName) ->
@@ -1578,7 +1491,7 @@ joinTwoRoutesData routes' stops' v1 v2 v3 v4 =
                               Left e9 -> Left e9
                               Right foundStops -> Right (newRoute, foundStops)
 -- <join_two_trips> ::= "join_two_trips(" <trip> ", " <trip> ", " <new_trip_id> ", " <new_name> ")"
-joinTwoTrips :: State -> Query -> Either String (Trip, State)
+joinTwoTrips :: MyState -> Query -> Either String (Trip, MyState)
 joinTwoTrips state query' =
   case query' of
     (JoinTwoTrips trip1 trip2 newTripId newName) ->
@@ -1600,7 +1513,7 @@ joinTwoTrips state query' =
                       Right newState -> Right (newTrip, newState)
     _ -> Left "Not a join two trips query"
 -- <join_two_routes_at_stop> ::= "join_two_routes_at_stop(" <route> ", " <route> ", " <stop_or_creat_or_nextprev> ", " <new_route_id> ", " <new_name> ")" -- min distance order
-joinTwoRoutesAtStop :: State -> Query -> Either String (Route, State)
+joinTwoRoutesAtStop :: MyState -> Query -> Either String (Route, MyState)
 joinTwoRoutesAtStop state query' =
   case query' of
     (JoinTwoRoutesAtStop route1' route2' stopOrCreateNew newRouteId newName) ->
@@ -1654,7 +1567,7 @@ joinTwoRoutesAtStop state query' =
 
 
 -- QUERY HELPERS
-parseQueryRouteData :: QueryRoute -> State -> Either String (Route, State) -- create new route if needed and return the route id
+parseQueryRouteData :: QueryRoute -> MyState -> Either String (Route, MyState) -- create new route if needed and return the route id
 parseQueryRouteData query' state =
   case query' of
     (Route' routeId) ->
@@ -1682,7 +1595,7 @@ parseQueryRouteData query' state =
           Left e1 -> Left e1
           Right newState -> Right newState
 -- QUERY HELPERS
-parseQueryStopOrPathOrCreateData :: QueryStopOrPathOrCreate -> State -> Either String (StopOrPath, State)
+parseQueryStopOrPathOrCreateData :: QueryStopOrPathOrCreate -> MyState -> Either String (StopOrPath, MyState)
 parseQueryStopOrPathOrCreateData query' state =
   case query' of
     (QueryStopOrPath' query'') ->
@@ -1720,7 +1633,7 @@ parseQueryStopOrPathOrCreateData query' state =
                 Left e2 -> Left e2
                 Right foundStop -> Right (Stop' foundStop, newState)
 -- QUERY HELPERS
-parseQueryStopOrPathData :: QueryStopOrPath -> State -> Either String (StopOrPath, State)
+parseQueryStopOrPathData :: QueryStopOrPath -> MyState -> Either String (StopOrPath, MyState)
 parseQueryStopOrPathData query' state =
   case query' of
     (StopId' stopId) ->
@@ -1737,7 +1650,7 @@ parseQueryStopOrPathData query' state =
           Right foundPath -> Right (Path' foundPath, state)
     _ -> Left "Not a stop or path query"
 -- QUERY HELPERS
-parseQueryStopOrCreatOrNextPrevData :: QueryStopOrCreatOrNextPrev -> State -> Either String (Stop, State)
+parseQueryStopOrCreatOrNextPrevData :: QueryStopOrCreatOrNextPrev -> MyState -> Either String (Stop, MyState)
 parseQueryStopOrCreatOrNextPrevData query' state =
   case query' of
     (QueryStopOrCreatOrNextPrevStop stopId) ->
@@ -1775,7 +1688,7 @@ parseQueryStopOrCreatOrNextPrevData query' state =
                 Left e2 -> Left e2
                 Right foundStop -> Right (foundStop, newState)
 -- QUERY HELPERS
-parseQueryTripData :: QueryTrip -> State -> Either String  (Trip, State)
+parseQueryTripData :: QueryTrip -> MyState -> Either String  (Trip, MyState)
 parseQueryTripData query' state =
   case query' of
     (Trip' tripId) ->
@@ -1791,7 +1704,7 @@ parseQueryTripData query' state =
           Left e1 -> Left e1
           Right (trip, newState) -> Right (trip, newState)
 -- QUERY HELPERS
-parseQueryStopOrPathOrCreatListData :: [QueryStopOrPathOrCreate] -> State -> Either String ([StopOrPath], State)
+parseQueryStopOrPathOrCreatListData :: [QueryStopOrPathOrCreate] -> MyState -> Either String ([StopOrPath], MyState)
 parseQueryStopOrPathOrCreatListData [] state = Right ([], state)
 parseQueryStopOrPathOrCreatListData (h:t) state =
   let
@@ -1806,7 +1719,7 @@ parseQueryStopOrPathOrCreatListData (h:t) state =
             Right (stopOrPathList, newState') -> Right (stopOrPath : stopOrPathList, newState')
 
 
-parseQueryStopOrCreatOrNextPrevListData :: [QueryStopOrCreatOrNextPrev] -> State -> Either String ([Stop], State)
+parseQueryStopOrCreatOrNextPrevListData :: [QueryStopOrCreatOrNextPrev] -> MyState -> Either String ([Stop], MyState)
 parseQueryStopOrCreatOrNextPrevListData [] state = Right ([], state)
 parseQueryStopOrCreatOrNextPrevListData (h:t) state =
   let
@@ -1827,7 +1740,7 @@ parseQueryStopOrCreatOrNextPrevListData (h:t) state =
 -- | An entity which represents your program's state.
 -- Currently it has no constructors but you can introduce
 -- as many as needed.
-data State = State {
+data MyState = State {
   stops :: [Stop],
   routes :: [Route],
   paths :: [Path],
@@ -1836,27 +1749,27 @@ data State = State {
 
 -- | Creates an initial program's state.
 -- It is called once when the program starts.
-emptyState :: State
+emptyState :: MyState
 emptyState = State [] [] [] []
 
 
 
 -- STATE HELPER FUNCTIONS
-addTrip :: Trip -> State -> Either String State
+addTrip :: Trip -> MyState -> Either String MyState
 addTrip trip state =
   let
     trips' = addToArray trip (trips state)
     in case trips' of
       Left e1 -> Left e1
       Right v1 -> Right state {trips = v1}
-getTrip :: TripId -> State -> Either String Trip
+getTrip :: TripId -> MyState -> Either String Trip
 getTrip targetId state = getTrip' targetId (trips state)
   where
     getTrip' _ [] = Left "Trip not found"
     getTrip' targetId' (Trip tid name stopOrPath : rest)
       | targetId' == tid = Right (Trip tid name stopOrPath)
       | otherwise       = getTrip' targetId' rest
-updateTrip :: Trip -> State -> Either String State
+updateTrip :: Trip -> MyState -> Either String MyState
 updateTrip trip state =
   let
     target = getTrip (case trip of Trip tid _ _ -> tid) state
@@ -1868,7 +1781,7 @@ updateTrip trip state =
           in case trips' of
             Left e1' -> Left e1'
             Right v1 -> Right state {trips = v1}
-updateOrAddTrips :: [Trip] -> State -> Either String State
+updateOrAddTrips :: [Trip] -> MyState -> Either String MyState
 updateOrAddTrips [] state = Right state
 updateOrAddTrips (h:t) state =
   let
@@ -1881,7 +1794,7 @@ updateOrAddTrips (h:t) state =
             Left e1 -> Left e1
             Right v1 -> updateOrAddTrips t v1
       Right v1 -> updateOrAddTrips t v1
-deleteTrip :: TripId -> State -> Either String State
+deleteTrip :: TripId -> MyState -> Either String MyState
 deleteTrip targetId state =
   let
     target = getTrip targetId state
@@ -1893,24 +1806,24 @@ deleteTrip targetId state =
           in case trips' of
             Left e1' -> Left e1'
             Right v1 -> Right state {trips = v1}
-tripInState :: Trip -> State -> Bool
+tripInState :: Trip -> MyState -> Bool
 tripInState trip state = elementInArray trip (trips state)
 -- STATE HELPER FUNCTIONS
-addStop :: Stop -> State -> Either String State
+addStop :: Stop -> MyState -> Either String MyState
 addStop stop state =
   let
     stops' = addToArray stop (stops state)
     in case stops' of
       Left e1 -> Left e1
       Right v1 -> Right state {stops = v1}
-getStop :: StopId -> State -> Either String Stop
+getStop :: StopId -> MyState -> Either String Stop
 getStop targetId state = getStop' targetId (stops state)
   where
     getStop' _ [] = Left "Stop not found"
     getStop' targetId' (Stop sid name point prevStops nextStops routes : rest)
       | targetId' == sid = Right (Stop sid name point prevStops nextStops routes)
       | otherwise       = getStop' targetId' rest
-updateStop :: Stop -> State -> Either String State
+updateStop :: Stop -> MyState -> Either String MyState
 updateStop stop state =
   let
     target = getStop (case stop of Stop sid _ _ _ _ _ -> sid) state
@@ -1922,7 +1835,7 @@ updateStop stop state =
           in case stops' of
             Left e1' -> Left e1'
             Right v1 -> Right state {stops = v1}
-updateOrAddStops :: [Stop] -> State -> Either String State
+updateOrAddStops :: [Stop] -> MyState -> Either String MyState
 updateOrAddStops [] state = Right state
 updateOrAddStops (h:t) state =
   let
@@ -1935,7 +1848,7 @@ updateOrAddStops (h:t) state =
             Left e1 -> Left e1
             Right v1 -> updateOrAddStops t v1
       Right v1 -> updateOrAddStops t v1
-deleteStop :: StopId -> State -> Either String State
+deleteStop :: StopId -> MyState -> Either String MyState
 deleteStop targetId state =
   let
     stop = getStop targetId state
@@ -1947,24 +1860,24 @@ deleteStop targetId state =
           in case stops' of
             Left e1' -> Left e1'
             Right v1 -> Right state {stops = v1}
-stopInState :: Stop -> State -> Bool
+stopInState :: Stop -> MyState -> Bool
 stopInState stop state = elementInArray stop (stops state)
 -- STATE HELPER FUNCTIONS
-addRoute :: Route -> State -> Either String State
+addRoute :: Route -> MyState -> Either String MyState
 addRoute route state =
   let
     routes' = addToArray route (routes state)
     in case routes' of
       Left e1 -> Left e1
       Right v1 -> Right state {routes = v1}
-getRoute :: RouteId -> State -> Either String Route
+getRoute :: RouteId -> MyState -> Either String Route
 getRoute targetId state = getRoute' targetId (routes state)
   where
     getRoute' _ [] = Left "Route not found"
     getRoute' targetId' (Route rid name stopIds : rest)
       | targetId' == rid = Right (Route rid name stopIds)
       | otherwise       = getRoute' targetId' rest
-updateRoute :: Route -> State -> Either String State
+updateRoute :: Route -> MyState -> Either String MyState
 updateRoute route state =
   let
     target = getRoute (case route of Route rid _ _ -> rid) state
@@ -1976,7 +1889,7 @@ updateRoute route state =
           in case routes' of
             Left e1' -> Left e1'
             Right v1 -> Right state {routes = v1}
-updateOrAddRoutes :: [Route] -> State -> Either String State
+updateOrAddRoutes :: [Route] -> MyState -> Either String MyState
 updateOrAddRoutes [] state = Right state
 updateOrAddRoutes (h:t) state =
   let
@@ -1989,7 +1902,7 @@ updateOrAddRoutes (h:t) state =
             Left e1 -> Left e1
             Right v1 -> updateOrAddRoutes t v1
       Right v1 -> updateOrAddRoutes t v1
-deleteRoute :: RouteId -> State -> Either String State
+deleteRoute :: RouteId -> MyState -> Either String MyState
 deleteRoute targetId state =
   let
     route = getRoute targetId state
@@ -2001,24 +1914,24 @@ deleteRoute targetId state =
           in case routes' of
             Left e1' -> Left e1'
             Right v1 -> Right state {routes = v1}
-routeInState :: Route -> State -> Bool
+routeInState :: Route -> MyState -> Bool
 routeInState route state = elementInArray route (routes state)
 -- STATE HELPER FUNCTIONS
-addPath :: Path -> State -> Either String State
+addPath :: Path -> MyState -> Either String MyState
 addPath path state =
   let
     paths' = addToArray path (paths state)
     in case paths' of
       Left e1 -> Left e1
       Right v1 -> Right state {paths = v1}
-getPath :: PathId -> State -> Either String Path
+getPath :: PathId -> MyState -> Either String Path
 getPath targetId state = getPath' targetId (paths state)
   where
     getPath' _ [] = Left "Path not found"
     getPath' targetId' (Path pid name pathLenght startId endId : rest)
       | targetId' == pid = Right (Path pid name pathLenght startId endId)
       | otherwise       = getPath' targetId' rest
-updatePath :: Path -> State -> Either String State
+updatePath :: Path -> MyState -> Either String MyState
 updatePath path state =
   let
     target = getPath (case path of Path pid _ _ _ _ -> pid) state
@@ -2030,7 +1943,7 @@ updatePath path state =
           in case paths' of
             Left e1' -> Left e1'
             Right v1 -> Right state {paths = v1}
-updateOrAddPaths :: [Path] -> State -> Either String State
+updateOrAddPaths :: [Path] -> MyState -> Either String MyState
 updateOrAddPaths [] state = Right state
 updateOrAddPaths (h:t) state =
   let
@@ -2043,7 +1956,7 @@ updateOrAddPaths (h:t) state =
             Left e1 -> Left e1
             Right v1 -> updateOrAddPaths t v1
       Right v1 -> updateOrAddPaths t v1
-deletePath :: PathId -> State -> Either String State
+deletePath :: PathId -> MyState -> Either String MyState
 deletePath targetId state =
   let
     path = getPath targetId state
@@ -2055,13 +1968,13 @@ deletePath targetId state =
           in case paths' of
             Left e1' -> Left e1'
             Right v1 -> Right state {paths = v1}
-pathInState :: Path -> State -> Bool
+pathInState :: Path -> MyState -> Bool
 pathInState path state = elementInArray path (paths state)
 
 
 
 -- get stopOrPath from QueryStopOrPath
-getStopOrPath :: QueryStopOrPath -> State -> Either String StopOrPath
+getStopOrPath :: QueryStopOrPath -> MyState -> Either String StopOrPath
 getStopOrPath query' state =
   case query' of
     (StopId' stopId) ->
@@ -2078,7 +1991,7 @@ getStopOrPath query' state =
           Right foundPath -> Right (Path' foundPath)
     _ -> Left "Not a stop or path query"
 
-getManyStopOrPath :: [QueryStopOrPath] -> State -> Either String [StopOrPath]
+getManyStopOrPath :: [QueryStopOrPath] -> MyState -> Either String [StopOrPath]
 getManyStopOrPath [] state = Right []
 getManyStopOrPath (h:t) state =
   let
@@ -2109,7 +2022,7 @@ combineMessages msg Nothing = msg
 combineMessages (Just msg1) (Just msg2) = Just (msg1 ++ msg2)
 
 
-multiQuery :: (Either String (Maybe String, State)) -> String -> Either String (Maybe String, State)
+multiQuery :: (Either String (Maybe String, MyState)) -> String -> Either String (Maybe String, MyState)
 multiQuery prevQuer stringInp =
   case prevQuer of
     Left e1 -> Left e1
@@ -2131,7 +2044,7 @@ multiQuery prevQuer stringInp =
 
 
 -- parsequery with stateTransition
-stateWithQuery :: State -> String -> Either String (Maybe String, State)
+stateWithQuery :: MyState -> String -> Either String (Maybe String, MyState)
 stateWithQuery state input = 
   let
     query = parseQuery input
@@ -2151,7 +2064,7 @@ getQuery input =
 -- between repl iterations.
 -- Right contains an optional message to print and
 -- an updated program's state.
-stateTransition :: State -> Query -> Either String (Maybe String, State)
+stateTransition :: MyState -> Query -> Either String (Maybe String, MyState)
 stateTransition state query = 
   case query of
     (CreateStop _ _ _) -> case createStop state query of

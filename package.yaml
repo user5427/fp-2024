@@ -87,6 +87,7 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - fp2024
+    - free
     - repline
     - lens
     - wreq

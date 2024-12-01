@@ -110,7 +110,8 @@ ERROR:Trip stops or paths are not connected
 Trips joined
 >>> validate_trip(T4)
 ERROR:Trip stops or paths are not connected
->>> SAVE
+>>> 
+
 Saved
 >>> 
 

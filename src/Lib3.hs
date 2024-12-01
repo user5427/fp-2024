@@ -102,11 +102,11 @@ parseCommand input =
 parseLoadingCommand :: Parser Command
 parseLoadingCommand = Parser {
   runParser = \input ->
-    case Lib2.parseExact "LOAD" input of
-      Right (_, r) -> Right (LoadCommand, r)
-      Left e -> case Lib2.parseExact "SAVE" input of
-        Right (_, r) -> Right (SaveCommand, r)
-        Left e2 -> Left e2
+    case Lib2.parse (Lib2.parseExact "LOAD") input of
+      (Right _, r) -> Right (LoadCommand, r)
+      (Left _, _) -> case Lib2.parse (Lib2.parseExact "SAVE") input of
+        (Right _, r) -> Right (SaveCommand, r)
+        (Left e2, _) -> Left e2
 }
 
 parseStatementsCommand :: Parser Command
@@ -189,9 +189,10 @@ parseSeperator = (parseExact "; ") <|> (parseExact ";")
 
 initialBEGIN :: String -> Either String String
 initialBEGIN input =
-  case Lib2.parseExact "BEGIN " input of
-    Right (_, r) -> Right r
-    Left e -> Left e
+  case Lib2.parse (Lib2.parseExact "BEGIN ") input of
+    (Right _, r) -> Right r
+    (Left e, _) -> Left e
+
 
 closingEND :: String -> Either String String
 closingEND input =
@@ -201,7 +202,7 @@ closingEND input =
 
 -- | Converts program's state into Statements
 -- (probably a batch, but might be a single query)
-marshallState :: Lib2.State -> Statements
+marshallState :: Lib2.MyState -> Statements
 marshallState states =
   let
     stops = createAllStops states
@@ -211,7 +212,7 @@ marshallState states =
     connestions = createAllConnections states
     in Batch (stops ++ routes ++ paths ++ trips ++ connestions)
 
-createAllStops :: Lib2.State -> [Query]
+createAllStops :: Lib2.MyState -> [Query]
 createAllStops state =
   let
     stopCreatingCommand = stopCreatingCommand' (Lib2.stops state) [] -- "create_stop(S1, PlsHelp, 0.55, 0.66)"
@@ -224,7 +225,7 @@ createAllStops state =
         st = Lib2.CreateStop id name point
         in stopCreatingCommand' xs (acc ++ [st])
 
-createAllRoutes :: Lib2.State -> [Query] -- "create_route(R1, imabouttodiefromhaskell, S1, S2, S3)"
+createAllRoutes :: Lib2.MyState -> [Query] -- "create_route(R1, imabouttodiefromhaskell, S1, S2, S3)"
 createAllRoutes state =
   let
     routeCreatingCommand = routeCreatingCommand' (Lib2.routes state) []
@@ -238,7 +239,7 @@ createAllRoutes state =
         rt = Lib2.CreateRoute id name (transform)
         in routeCreatingCommand' xs (acc ++ [rt])
 
-createAllPaths :: Lib2.State -> [Query] -- "create_path(P1, path, 1.0, S1, S2)"
+createAllPaths :: Lib2.MyState -> [Query] -- "create_path(P1, path, 1.0, S1, S2)"
 createAllPaths state =
   let
     pathCreatingCommand = pathCreatingCommand' (Lib2.paths state) []
@@ -251,7 +252,7 @@ createAllPaths state =
         pt = Lib2.CreatePath id name length stop1 stop2
         in pathCreatingCommand' xs (acc ++ [pt])
 
-createAllTrips :: Lib2.State -> [Query] -- "create_trip(T1, trip, S1, S2, P1, S3)" S1 S2 P1 S3 - list of StopOrPath
+createAllTrips :: Lib2.MyState -> [Query] -- "create_trip(T1, trip, S1, S2, P1, S3)" S1 S2 P1 S3 - list of StopOrPath
 createAllTrips state =
   let
     tripCreatingCommand = tripCreatingCommand' (Lib2.trips state) []
@@ -265,7 +266,7 @@ createAllTrips state =
         tr = Lib2.CreateTrip id name transform
         in tripCreatingCommand' xs (acc ++ [tr])
 
-createAllConnections :: Lib2.State -> [Query] -- "set_next_stop(S1, R1, S2)" "set_previous_stop(S1, R1, S2)" SetNextStop SetPreviousStop
+createAllConnections :: Lib2.MyState -> [Query] -- "set_next_stop(S1, R1, S2)" "set_previous_stop(S1, R1, S2)" SetNextStop SetPreviousStop
 createAllConnections state =
   let
     stops = Lib2.stops state -- data Stop = Stop StopId Name Point [NextStop] [PreviousStop] [RouteId] deriving (Show, Eq)
@@ -351,7 +352,7 @@ renderStatements batch =
 -- State update must be executed atomically (STM).
 -- Right contains an optional message to print, updated state
 -- is stored in transactinal variable
-stateTransition :: TVar Lib2.State -> Command -> Chan StorageOp ->
+stateTransition :: TVar Lib2.MyState -> Command -> Chan StorageOp ->
                    IO (Either String (Maybe String))
 stateTransition stateVar cmd ioChan = case cmd of
   LoadCommand -> do
@@ -386,7 +387,7 @@ stateTransition stateVar cmd ioChan = case cmd of
 
 
 
-applyStatementsToState :: Statements -> Lib2.State -> Either String (Maybe String, Lib2.State)
+applyStatementsToState :: Statements -> Lib2.MyState -> Either String (Maybe String, Lib2.MyState)
 applyStatementsToState statements state = applyStatementsToState' statements state [] 0
   where
     applyStatementsToState' (Single st) state' _ _ =
