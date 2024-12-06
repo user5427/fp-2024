@@ -136,31 +136,29 @@ instance ToCommandString QRoute where
     toCommandString (CreateRoute' myDomainTransport) = toCommandString myDomainTransport
     toCommandString (JoinTwoRoutes' myDomainTransport) = toCommandString myDomainTransport
     toCommandString (JoinTwoRoutesAtStop' myDomainTransport) = toCommandString myDomainTransport
-
+-- todo check if the arguments are correct type
 
 instance ToCommandString (MyDomainTransport next) where
-    toCommandString (CreateStop (Lib2.StopId s i) (Lib2.Name n) (Lib2.Point (Lib2.CoordX x) (Lib2.CoordY y)) next) = "CreateStop(" ++ [s] ++ show i ++ ", " ++ show n ++ ", " ++ show x ++ ", " ++ show y ++ ")"
-    toCommandString (CreateRoute (Lib2.RouteId r i) (Lib2.Name n) qscnps next) = "CreateRoute(" ++ [r] ++ show i ++ ", " ++ show n ++ ", " ++ (convertQSCNPToString qscnps) ++ ")"
-    toCommandString (CreatePath (Lib2.PathId p i) (Lib2.Name n) (Lib2.PathLenght l) (Lib2.StopId s1 i1) (Lib2.StopId s2 i2) next) = "CreatePath(" ++ [p] ++ show i ++ ", " ++ show n ++ ", " ++ show l ++ ", " ++ show s1 ++ show i1 ++ ", " ++ show s2 ++ show i2 ++ ")"
-    toCommandString (CreateTrip (Lib2.TripId t i) (Lib2.Name n) qpscnp next) = "CreateTrip(" ++ [t] ++ show i ++ ", " ++ show n ++ ", " ++ (convertQPSCNPToString qpscnp) ++ ")"
-    toCommandString (JoinTwoTrips qt1 qt2 (Lib2.TripId t i) (Lib2.Name n) next) = "JoinTwoTrips(" ++ [t] ++ show i ++ ", " ++ show n ++ ", " ++ (toCommandString qt1) ++ ", " ++ (toCommandString qt2) ++ ")"
-    toCommandString (JoinTwoRoutes qr1 qr2 (Lib2.RouteId r i) (Lib2.Name n) next) = "JoinTwoRoutes(" ++ [r] ++ show i ++ ", " ++ show n ++ ", " ++ (toCommandString qr1) ++ ", " ++ (toCommandString qr2) ++ ")"
-    toCommandString (JoinTwoRoutesAtStop qr1 qr2 qscnp (Lib2.RouteId r i) (Lib2.Name n) next) = "JoinTwoRoutesAtStop(" ++ [r] ++ show i ++ ", " ++ show n ++ ", " ++ (toCommandString qr1) ++ ", " ++ (toCommandString qr2) ++ ", " ++ (toCommandString qscnp) ++ ")"
-    toCommandString (CleanupTrip qt next) = "CleanupTrip(" ++ (toCommandString qt) ++ ")"
-    toCommandString (ValidateTrip qt next) = "ValidateTrip(" ++ (toCommandString qt) ++ ")"
-    toCommandString (FindNextStop (Lib2.StopId s i) (Lib2.RouteId r i1) next) = "FindNextStop(" ++ [s] ++ show i ++ ", " ++ [r] ++ show i1 ++ ")"
-    toCommandString (FindPreviousStop (Lib2.StopId s i) (Lib2.RouteId r i1) next) = "FindPreviousStop(" ++ [s] ++ show i ++ ", " ++ [r] ++ show i1 ++ ")"
-    toCommandString (TripDistance qt next) = "TripDistance(" ++ (toCommandString qt) ++ ")"
-    toCommandString (SetNextStop (Lib2.StopId s i) (Lib2.RouteId r i1) (Lib2.StopId s1 i2) next) = "SetNextStop(" ++ [s] ++ show i ++ ", " ++ [r] ++ show i1 ++ ", " ++ show s1 ++ show i2 ++ ")"
-    toCommandString (SetPreviousStop (Lib2.StopId s i) (Lib2.RouteId r i1) (Lib2.StopId s1 i2) next) = "SetPreviousStop(" ++ [s] ++ show i ++ ", " ++ [r] ++ show i1 ++ ", " ++ show s1 ++ show i2 ++ ")"
-    toCommandString (ConnectRouteStopsByMinDistance (Lib2.RouteId r i) next) = "ConnectRouteStopsByMinDistance(" ++ [r] ++ show i ++ ")"
-    toCommandString (CheckIfRouteStopsConnected (Lib2.RouteId r i) next) = "CheckIfRouteStopsConnected(" ++ [r] ++ show i ++ ")"
-    toCommandString (DistanceBetweenStops (Lib2.StopId s i) (Lib2.StopId s1 i1) next) = "DistanceBetweenStops(" ++ [s] ++ show i ++ ", " ++ [s1] ++ show i1 ++ ")"
-    toCommandString (AssignStopToRoute (Lib2.StopId s i) (Lib2.RouteId r i1) next) = "AssignStopToRoute(" ++ [s] ++ show i ++ ", " ++ [r] ++ show i1 ++ ")"
+    toCommandString (CreateStop (Lib2.StopId s i) (Lib2.Name n) (Lib2.Point (Lib2.CoordX x) (Lib2.CoordY y)) next) = "create_stop(" ++ [s] ++ show i ++ ", " ++ n ++ ", " ++ show x ++ ", " ++ show y ++ "); "
+    toCommandString (CreateRoute (Lib2.RouteId r i) (Lib2.Name n) qscnps next) = "create_route(" ++ [r] ++ show i ++ ", " ++ n ++ ", " ++ (convertQSCNPToString qscnps) ++ "); "
+    toCommandString (CreatePath (Lib2.PathId p i) (Lib2.Name n) (Lib2.PathLenght l) (Lib2.StopId s1 i1) (Lib2.StopId s2 i2) next) = "create_path(" ++ [p] ++ show i ++ ", " ++ n ++ ", " ++ show l ++ ", " ++ show s1 ++ show i1 ++ ", " ++ show s2 ++ show i2 ++ "); "
+    toCommandString (CreateTrip (Lib2.TripId t i) (Lib2.Name n) qpscnp next) = "create_trip(" ++ [t] ++ show i ++ ", " ++ n ++ ", " ++ (convertQPSCNPToString qpscnp) ++ "); "
+    toCommandString (JoinTwoTrips qt1 qt2 (Lib2.TripId t i) (Lib2.Name n) next) = "join_two_trips(" ++ (toCommandString qt1) ++ ", " ++ (toCommandString qt2) ++ ", " ++ [t] ++ show i ++ ", " ++ n ++ "); "
+    toCommandString (JoinTwoRoutes qr1 qr2 (Lib2.RouteId r i) (Lib2.Name n) next) = "join_two_routes(" ++ [r] ++ show i ++ ", " ++ n ++ ", " ++ (toCommandString qr1) ++ ", " ++ (toCommandString qr2) ++ "); "
+    toCommandString (JoinTwoRoutesAtStop qr1 qr2 qscnp (Lib2.RouteId r i) (Lib2.Name n) next) = "join_two_routes_at_stop(" ++ [r] ++ show i ++ ", " ++ n ++ ", " ++ (toCommandString qr1) ++ ", " ++ (toCommandString qr2) ++ ", " ++ (toCommandString qscnp) ++ "); "
+    toCommandString (CleanupTrip qt next) = "cleanup_trip(" ++ (toCommandString qt) ++ "); "
+    toCommandString (ValidateTrip qt next) = "validate_trip(" ++ (toCommandString qt) ++ "); "
+    toCommandString (FindNextStop (Lib2.StopId s i) (Lib2.RouteId r i1) next) = "find_next_stop(" ++ [s] ++ show i ++ ", " ++ [r] ++ show i1 ++ "); "
+    toCommandString (FindPreviousStop (Lib2.StopId s i) (Lib2.RouteId r i1) next) = "find_previous_stop(" ++ [s] ++ show i ++ ", " ++ [r] ++ show i1 ++ "); "
+    toCommandString (TripDistance qt next) = "trip_distance(" ++ (toCommandString qt) ++ "); "
+    toCommandString (SetNextStop (Lib2.StopId s i) (Lib2.RouteId r i1) (Lib2.StopId s1 i2) next) = "set_next_stop(" ++ [s] ++ show i ++ ", " ++ [r] ++ show i1 ++ ", " ++ show s1 ++ show i2 ++ "); "
+    toCommandString (SetPreviousStop (Lib2.StopId s i) (Lib2.RouteId r i1) (Lib2.StopId s1 i2) next) = "set_previous_stop(" ++ [s] ++ show i ++ ", " ++ [r] ++ show i1 ++ ", " ++ show s1 ++ show i2 ++ "); "
+    toCommandString (ConnectRouteStopsByMinDistance (Lib2.RouteId r i) next) = "connect_route_stops_by_min_dist(" ++ [r] ++ show i ++ "); "
+    toCommandString (CheckIfRouteStopsConnected (Lib2.RouteId r i) next) = "check_if_route_stops_connected(" ++ [r] ++ show i ++ "); "
+    toCommandString (DistanceBetweenStops (Lib2.StopId s i) (Lib2.StopId s1 i1) next) = "distance_between_stops(" ++ [s] ++ show i ++ ", " ++ [s1] ++ show i1 ++ "); "
+    toCommandString (AssignStopToRoute (Lib2.StopId s i) (Lib2.RouteId r i1) next) = "assign_stop_to_route(" ++ [s] ++ show i ++ ", " ++ [r] ++ show i1 ++ "); "
 
-    toCommandString (View _) = "VIEW"
-    toCommandString (Save _) = "SAVE"
-    toCommandString (Load _) = "LOAD"
+    toCommandString (View _) = "VIEW; "
     toCommandString _ = error "Unsupported command"
 
 
@@ -194,10 +192,15 @@ interpretHttp (Free step) = do
     where
         runStep :: MyDomainTransport a -> IO a
         runStep a = do
-            let commandString = toCommandString a
-            putStrLn $ "Sending command: " ++ commandString
+            let 
+                formComString = case a of
+                    Save _ -> "SAVE"
+                    Load _ -> "LOAD"
+                    _ -> "BEGIN " ++ toCommandString a ++ "END"
+                    
+            putStrLn $ "Sending command: " ++ formComString
 
-            resp <- post "http://localhost:3000" (cs commandString :: ByteString)
+            resp <- post "http://localhost:3000" (cs formComString :: ByteString)
             let serverResponse = cs $ resp ^. responseBody :: String
             putStrLn $ "Server response: " ++ serverResponse
 

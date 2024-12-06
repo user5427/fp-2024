@@ -105,6 +105,7 @@ executables:
     - repline
     - scotty
     - string-conversions
+    - stm
 
 tests:
   fp2024-test:
