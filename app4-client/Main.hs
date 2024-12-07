@@ -9,10 +9,15 @@ import Data.ByteString ( ByteString )
 import Network.Wreq ( post, responseBody )
 import Data.String.Conversions
 import Control.Lens
-import qualified Lib2 
+import qualified Lib2
 import Data.IORef
 import Lib2 (QueryStopOrCreatOrNextPrev)
+import qualified GHC.Base as Control.Monad
 
+import Control.Monad.Trans.Class (lift)
+import Control.Monad.Trans.State.Strict (State, StateT, get, put, runState, runStateT, evalStateT, modify)
+import Control.Monad (when, unless)
+import Data.List (intercalate)
 
 
 data QSCNP = Stop Lib2.StopId | CreateStop' (MyDomainTransport ()) | FindNextStop' (MyDomainTransport ()) | FindPreviousStop' (MyDomainTransport ())
@@ -165,24 +170,25 @@ instance ToCommandString (MyDomainTransport next) where
 
 convertQSCNPToString :: [QSCNP] -> String
 convertQSCNPToString [] = ""
-convertQSCNPToString (x:xs) = 
+convertQSCNPToString (x:xs) =
     let
         xStr = toCommandString x
         xsStr = convertQSCNPToString xs
-    in if null xsStr 
-        then xStr 
+    in if null xsStr
+        then xStr
         else xStr ++ ", " ++ xsStr
 
 convertQPSCNPToString :: [QPSCNP] -> String
 convertQPSCNPToString [] = ""
-convertQPSCNPToString (x:xs) = 
+convertQPSCNPToString (x:xs) =
     let
         xStr = toCommandString x
         xsStr = convertQPSCNPToString xs
-    in if null xsStr 
-        then xStr 
+    in if null xsStr
+        then xStr
         else xStr ++ ", " ++ xsStr
 
+-- send each command separately
 interpretHttp :: MyDomain a -> IO a
 interpretHttp (Pure a) = return a
 interpretHttp (Free step) = do
@@ -192,49 +198,106 @@ interpretHttp (Free step) = do
     where
         runStep :: MyDomainTransport a -> IO a
         runStep a = do
-            let 
+            let
                 formComString = case a of
                     Save _ -> "SAVE"
                     Load _ -> "LOAD"
                     _ -> "BEGIN " ++ toCommandString a ++ "END"
-                    
+
             putStrLn $ "Sending command: " ++ formComString
 
-            resp <- post "http://localhost:3000" (cs formComString :: ByteString)
+            resp <- post "http://localhost:3001" (cs formComString :: ByteString)
             let serverResponse = cs $ resp ^. responseBody :: String
             putStrLn $ "Server response: " ++ serverResponse
 
             case a of
-                CreateStop _ _ _ next -> return $ next ()
-                CreateRoute _ _ _ next -> return $ next ()
-                CreatePath _ _ _ _ _ next -> return $ next ()
-                CreateTrip _ _ _ next -> return $ next ()
-                JoinTwoTrips _ _ _ _ next -> return $ next ()
-                JoinTwoRoutes _ _ _ _ next -> return $ next ()
-                JoinTwoRoutesAtStop _ _ _ _ _ next -> return $ next ()
-                CleanupTrip _ next -> return $ next ()
-                ValidateTrip _ next -> return $ next ()
-                FindNextStop _ _ next -> return $ next ()
-                FindPreviousStop _ _ next -> return $ next ()
-                TripDistance _ next -> return $ next ()
-                SetNextStop _ _ _ next -> return $ next ()
-                SetPreviousStop _ _ _ next -> return $ next ()
-                ConnectRouteStopsByMinDistance _ next -> return $ next ()
-                CheckIfRouteStopsConnected _ next -> return $ next ()
-                DistanceBetweenStops _ _ next -> return $ next ()
-                AssignStopToRoute _ _ next -> return $ next ()
-                View next -> return $ next ()
                 Save next -> return $ next ()
                 Load next -> return $ next ()
+                _ -> return $ extractNext a
+
+-- Extract the continuation from the command
+extractNext :: MyDomainTransport a -> a
+extractNext (CreateStop _ _ _ next) = next ()
+extractNext (CreateRoute _ _ _ next) = next ()
+extractNext (CreatePath _ _ _ _ _ next) = next ()
+extractNext (CreateTrip _ _ _ next) = next ()
+extractNext (JoinTwoTrips _ _ _ _ next) = next ()
+extractNext (JoinTwoRoutes _ _ _ _ next) = next ()
+extractNext (JoinTwoRoutesAtStop _ _ _ _ _ next) = next ()
+extractNext (CleanupTrip _ next) = next ()
+extractNext (ValidateTrip _ next) = next ()
+extractNext (FindNextStop _ _ next) = next ()
+extractNext (FindPreviousStop _ _ next) = next ()
+extractNext (TripDistance _ next) = next ()
+extractNext (SetNextStop _ _ _ next) = next ()
+extractNext (SetPreviousStop _ _ _ next) = next ()
+extractNext (ConnectRouteStopsByMinDistance _ next) = next ()
+extractNext (CheckIfRouteStopsConnected _ next) = next ()
+extractNext (DistanceBetweenStops _ _ next) = next ()
+extractNext (AssignStopToRoute _ _ next) = next ()
+extractNext (View next) = next ()
+extractNext _ = error "Unsupported command"
+
+type BatchState a = StateT [String] IO a
+
+-- smart interpreter that can batch commands
+smartInterpretHttp :: MyDomain a -> IO a
+smartInterpretHttp a = evalStateT (runProgram a) []
+    where
+    runProgram :: MyDomain a -> BatchState a
+    runProgram (Pure a) = do
+        flushBatch -- Ensure all batched commands are sent
+        return a
+    runProgram (Free step) = do
+        next <- processCommand step
+        runProgram next
+
+    processCommand :: MyDomainTransport a -> BatchState a
+    processCommand cmd = case cmd of
+        Save next -> do
+            flushBatch
+            lift $ sendCommand "SAVE"
+            return $ next ()
+        Load next -> do
+            flushBatch
+            lift $ sendCommand "LOAD"
+            return $ next ()
+        -- Batchable commands
+        _ -> do
+            let commandStr = toCommandString cmd
+            batch <- get
+            put $ commandStr : batch
+            return $ extractNext cmd
+
+
+
+    -- Flush the batch of commands
+    flushBatch :: BatchState ()
+    flushBatch = do
+        batch <- get
+        unless (null batch) $ do
+            let batchCommand = "BEGIN " ++ intercalate "" (reverse batch) ++ "END"
+            lift $ sendCommand batchCommand
+            put []
+
+    -- Send a single command to the server
+    sendCommand :: String -> IO ()
+    sendCommand command = do
+        putStrLn $ "Sending command(s): " ++ command
+        resp <- post "http://localhost:3001" (cs command :: ByteString)
+        let serverResponse = cs $ resp ^. responseBody :: String
+        putStrLn $ "Server response: " ++ serverResponse
 
 -- >>> interpretHttp program
 -- ("","")
 program :: MyDomain (String, String)
 program = do
     createStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
+    createStop (Lib2.StopId 'S' 2) (Lib2.Name "StopName 2") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
     createRoute (Lib2.RouteId 'R' 2) (Lib2.Name "RouteName") [Stop (Lib2.StopId 'S' 1)]
+    createRoute (Lib2.RouteId 'R' 3) (Lib2.Name "RouteName 2") [Stop (Lib2.StopId 'S' 2)]
     createTrip (Lib2.TripId 'T' 1) (Lib2.Name "R") [Path (Lib2.PathId 'P' 1)]
-    joinTwoTrips (Trip (Lib2.TripId 'T' 2)) (Trip (Lib2.TripId 'T' 3)) (Lib2.TripId 'T' 99) (Lib2.Name "1X4R")
+    joinTwoRoutes (Route (Lib2.RouteId 'R' 2)) (Route (Lib2.RouteId 'R' 3)) (Lib2.RouteId 'R' 99) (Lib2.Name "1X4R")
     save
     return ("", "")
 
@@ -242,4 +305,4 @@ program = do
 
 main :: IO ()
 main = do
-    interpretHttp program >>= print
+    smartInterpretHttp program >>= print

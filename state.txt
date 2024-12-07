@@ -1,4 +1,2 @@
 BEGIN
-create_stop(S1, StopName, 10.0, 20.0);
-create_route(R2, RouteName, S1);
 END

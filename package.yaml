@@ -93,6 +93,7 @@ executables:
     - wreq
     - bytestring
     - string-conversions
+    - transformers
   fp2024-four-server:
     main:                Main.hs
     source-dirs:         app4-server

@@ -8,7 +8,7 @@
 <set_next_stop> | <set_previous_stop> | 
 <connect_route_stops_by_min_dist> | <check_if_route_stops_connected> |
 <distance_between_stops> | <assign_stop_to_route> |
-<find_next_stop> | <find_previous_stop>
+<find_next_stop> | < >
 
 <create_stop> ::= "create_stop(" <stop_id> ", " <name> ", " <point> ")"
 <set_next_stop> ::= "set_next_stop(" <stop_id> ", " <route_id> ", " <next_stop_id> ")"

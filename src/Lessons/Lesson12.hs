@@ -29,9 +29,16 @@ dump = liftF $ Dump id
 
 save :: MyDomain ()
 save = liftF $ Save id
+-- >>> evalPrint (runWithState program)
+-- No instance for (Show (State (Int, String) (String, String)))
+--   arising from a use of `evalPrint'
+-- In the expression: evalPrint (runWithState program)
+-- In an equation for `it_a18Kv':
+--     it_a18Kv = evalPrint (runWithState program)
 
--- >>> runIO program
--- ("24","36")
+-- >>> evalStateT (runWithState program)
+-- Variable not in scope:
+--   evalStateT :: State (Int, String) (String, String) -> t_a15iU[sk:1]
 program :: MyDomain (String, String)
 program = do
     load
