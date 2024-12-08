@@ -8,8 +8,9 @@ import Control.Monad.Free (Free (..), liftF)
 import Data.ByteString ( ByteString )
 import Network.Wreq ( post, responseBody )
 import Data.String.Conversions
-import Control.Lens
+import Control.Lens hiding (view)
 import qualified Lib2
+import qualified Lib3 
 import Data.IORef
 import Lib2 (QueryStopOrCreatOrNextPrev)
 import qualified GHC.Base as Control.Monad
@@ -146,10 +147,10 @@ instance ToCommandString QRoute where
 instance ToCommandString (MyDomainTransport next) where
     toCommandString (CreateStop (Lib2.StopId s i) (Lib2.Name n) (Lib2.Point (Lib2.CoordX x) (Lib2.CoordY y)) next) = "create_stop(" ++ [s] ++ show i ++ ", " ++ n ++ ", " ++ show x ++ ", " ++ show y ++ "); "
     toCommandString (CreateRoute (Lib2.RouteId r i) (Lib2.Name n) qscnps next) = "create_route(" ++ [r] ++ show i ++ ", " ++ n ++ ", " ++ (convertQSCNPToString qscnps) ++ "); "
-    toCommandString (CreatePath (Lib2.PathId p i) (Lib2.Name n) (Lib2.PathLenght l) (Lib2.StopId s1 i1) (Lib2.StopId s2 i2) next) = "create_path(" ++ [p] ++ show i ++ ", " ++ n ++ ", " ++ show l ++ ", " ++ show s1 ++ show i1 ++ ", " ++ show s2 ++ show i2 ++ "); "
+    toCommandString (CreatePath (Lib2.PathId p i) (Lib2.Name n) (Lib2.PathLenght l) (Lib2.StopId s1 i1) (Lib2.StopId s2 i2) next) = "create_path(" ++ [p] ++ show i ++ ", " ++ n ++ ", " ++ show l ++ ", " ++ [s1] ++ show i1 ++ ", " ++ [s2] ++ show i2 ++ "); "
     toCommandString (CreateTrip (Lib2.TripId t i) (Lib2.Name n) qpscnp next) = "create_trip(" ++ [t] ++ show i ++ ", " ++ n ++ ", " ++ (convertQPSCNPToString qpscnp) ++ "); "
     toCommandString (JoinTwoTrips qt1 qt2 (Lib2.TripId t i) (Lib2.Name n) next) = "join_two_trips(" ++ (toCommandString qt1) ++ ", " ++ (toCommandString qt2) ++ ", " ++ [t] ++ show i ++ ", " ++ n ++ "); "
-    toCommandString (JoinTwoRoutes qr1 qr2 (Lib2.RouteId r i) (Lib2.Name n) next) = "join_two_routes(" ++ [r] ++ show i ++ ", " ++ n ++ ", " ++ (toCommandString qr1) ++ ", " ++ (toCommandString qr2) ++ "); "
+    toCommandString (JoinTwoRoutes qr1 qr2 (Lib2.RouteId r i) (Lib2.Name n) next) = "join_two_routes(" ++ (toCommandString qr1) ++ ", " ++ (toCommandString qr2) ++ ", " ++ [r] ++ show i ++ ", " ++ n ++ "); "
     toCommandString (JoinTwoRoutesAtStop qr1 qr2 qscnp (Lib2.RouteId r i) (Lib2.Name n) next) = "join_two_routes_at_stop(" ++ [r] ++ show i ++ ", " ++ n ++ ", " ++ (toCommandString qr1) ++ ", " ++ (toCommandString qr2) ++ ", " ++ (toCommandString qscnp) ++ "); "
     toCommandString (CleanupTrip qt next) = "cleanup_trip(" ++ (toCommandString qt) ++ "); "
     toCommandString (ValidateTrip qt next) = "validate_trip(" ++ (toCommandString qt) ++ "); "
@@ -206,7 +207,7 @@ interpretHttp (Free step) = do
 
             putStrLn $ "Sending command: " ++ formComString
 
-            resp <- post "http://localhost:3001" (cs formComString :: ByteString)
+            resp <- post "http://localhost:3000" (cs formComString :: ByteString)
             let serverResponse = cs $ resp ^. responseBody :: String
             putStrLn $ "Server response: " ++ serverResponse
 
@@ -262,6 +263,10 @@ smartInterpretHttp a = evalStateT (runProgram a) []
             flushBatch
             lift $ sendCommand "LOAD"
             return $ next ()
+        View next -> do
+            flushBatch
+            lift $ sendCommand "VIEW"
+            return $ next ()
         -- Batchable commands
         _ -> do
             let commandStr = toCommandString cmd
@@ -284,25 +289,63 @@ smartInterpretHttp a = evalStateT (runProgram a) []
     sendCommand :: String -> IO ()
     sendCommand command = do
         putStrLn $ "Sending command(s): " ++ command
-        resp <- post "http://localhost:3001" (cs command :: ByteString)
+        resp <- post "http://localhost:3000" (cs command :: ByteString)
         let serverResponse = cs $ resp ^. responseBody :: String
         putStrLn $ "Server response: " ++ serverResponse
+
+inMemoryInterpreter :: MyDomain a -> IO a
+inMemoryInterpreter a = evalStateT (runProgram a) Lib2.emptyState
+    where
+        runProgram :: MyDomain a -> StateT Lib2.MyState IO a
+        runProgram (Pure a) = return a
+        runProgram (Free step) = do
+            next <- runStep step
+            runProgram next
+
+        runStep :: MyDomainTransport a -> StateT Lib2.MyState IO a
+        runStep a = do
+            let
+                formComString = case a of
+                    Save _ -> "SAVE"
+                    Load _ -> "LOAD"
+                    _ -> take (length (toCommandString a) - 2) (toCommandString a)
+
+            lift $ putStrLn $ "Sending command: " ++ formComString
+
+            case a of
+                Save next -> return $ next ()
+                Load next -> return $ next ()
+                _ -> do
+                    case Lib2.parseQuery formComString of
+                        Left e -> lift $ putStrLn $ "PARSE ERROR:" ++ e
+                        Right e -> do
+                            st <- get
+                            case Lib2.stateTransition st (fst e) of
+                                Left e2 -> lift $ putStrLn $ "ERROR:" ++ e2
+                                Right (m, ns) -> (put ns) >> mapM_ (lift . putStrLn) m
+                                
+                    return $ extractNext a
+
 
 -- >>> interpretHttp program
 -- ("","")
 program :: MyDomain (String, String)
 program = do
-    createStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
-    createStop (Lib2.StopId 'S' 2) (Lib2.Name "StopName 2") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
-    createRoute (Lib2.RouteId 'R' 2) (Lib2.Name "RouteName") [Stop (Lib2.StopId 'S' 1)]
-    createRoute (Lib2.RouteId 'R' 3) (Lib2.Name "RouteName 2") [Stop (Lib2.StopId 'S' 2)]
-    createTrip (Lib2.TripId 'T' 1) (Lib2.Name "R") [Path (Lib2.PathId 'P' 1)]
-    joinTwoRoutes (Route (Lib2.RouteId 'R' 2)) (Route (Lib2.RouteId 'R' 3)) (Lib2.RouteId 'R' 99) (Lib2.Name "1X4R")
     save
+    createStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
+    createStop (Lib2.StopId 'S' 2) (Lib2.Name "stop") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
+    view
+    createRoute (Lib2.RouteId 'R' 2) (Lib2.Name "route") [Stop (Lib2.StopId 'S' 1)]
+    createRoute (Lib2.RouteId 'R' 3) (Lib2.Name "routee") [Stop (Lib2.StopId 'S' 2)]
+    createPath (Lib2.PathId 'P' 1) (Lib2.Name "path") (Lib2.PathLenght 10.0) (Lib2.StopId 'S' 1) (Lib2.StopId 'S' 2)
+    createTrip (Lib2.TripId 'T' 1) (Lib2.Name "trippy") [Path (Lib2.PathId 'P' 1)]
+    view
+    joinTwoRoutes (Route (Lib2.RouteId 'R' 2)) (Route (Lib2.RouteId 'R' 3)) (Lib2.RouteId 'R' 99) (Lib2.Name "test")
+    view
     return ("", "")
 
 
 
 main :: IO ()
 main = do
-    smartInterpretHttp program >>= print
+    inMemoryInterpreter program >>= print

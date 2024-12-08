@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ImportQualifiedPost #-}
-module Main (main) where
+module Main (
+    main
+) where
     
 import Lib2 qualified
 import Lib3 qualified
@@ -48,7 +50,7 @@ main = do
     state <- newTVarIO Lib2.emptyState
     _ <- forkIO $ Lib3.storageOpLoop chan
 
-    scotty 3001 $ do
+    scotty 3000 $ do
         post "/" $ do
             b <- body
             output  <- liftIO $ do
