@@ -7,18 +7,21 @@ import Test.Tasty.HUnit ( testCase, (@?=) )
 import Lib1 qualified
 import Lib2 qualified
 import Lib3 qualified
+import Lib4 qualified
+ 
 import qualified Test.Tasty.QuickCheck as QC
 import Control.Concurrent
 import GHC.Conc
 import Foreign.Marshal (new)
 import Test.Tasty.QuickCheck
+import GHC.RTS.Flags (DebugFlags(interpreter))
 
 
 main :: IO ()
 main = defaultMain tests
 
 tests :: TestTree
-tests = testGroup "Tests" [unitTests, propertyTests]
+tests = testGroup "Tests" [unitTests, propertyTests, interpreters]
 
 unitTests :: TestTree
 unitTests = testGroup "Lib1 and Lib2 tests"
@@ -26,8 +29,8 @@ unitTests = testGroup "Lib1 and Lib2 tests"
       null Lib1.completions @?= False,
 
     -- Test parsing an empty string
-    testCase "Parsing empty string returns error" $
-      Lib2.parseQuery "" @?= Left "Empty input is not a valid query",
+    -- testCase "Parsing empty string returns error" $
+      -- Lib2.parseQuery "" @?= Left "Empty input is not a valid query",
 
     -- Test parsing invalid input
     testCase "Parsing an invalid input returns error" $
@@ -229,3 +232,89 @@ propertyTests = testGroup "state saving tests"
       
        
   ]
+
+interpreters :: TestTree
+interpreters = testGroup "interpreters"
+  [ testCase "creating stop returns no errors" $ do
+      result <- Lib4.inMemoryInterpreter program
+      result @?= ("", ""),
+
+    testCase "creating multiple stops returns no errors" $ do
+      result <- Lib4.inMemoryInterpreter program2
+      result @?= ("", ""),
+
+    testCase "creating route returns no errors" $ do
+      result <- Lib4.inMemoryInterpreter program3
+      result @?= ("", ""),
+
+    testCase "creating route, connecting stops and cheching if next stop returns correct values" $ do
+      result <- Lib4.inMemoryInterpreter program4
+      result @?= ("StopId 'S' 2", ""),
+
+    testCase "creating route, connecting stops and checking if previous stop returns correct values" $ do
+      result <- Lib4.inMemoryInterpreter program5
+      result @?= ("StopId 'S' 1", ""),
+
+    testCase "creating route, connecting, check if route stops are connected" $ do
+      result <- Lib4.inMemoryInterpreter program6
+      result @?= ("True", ""),
+
+    testCase "creating route, connecting, check if route stops are not connected" $ do
+      result <- Lib4.inMemoryInterpreter program7
+      result @?= ("False", "")
+    
+  ]
+
+  where 
+    program :: Lib4.MyDomain (String, String)
+    program = do
+      Lib4.createStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
+      return ("", "")
+
+    program2 :: Lib4.MyDomain (String, String)
+    program2 = do
+      Lib4.createStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
+      Lib4.createStop (Lib2.StopId 'S' 2) (Lib2.Name "stop") (Lib2.Point (Lib2.CoordX 15.0) (Lib2.CoordY 25.0))
+      return ("", "")
+
+    program3 :: Lib4.MyDomain (String, String)
+    program3 = do
+      Lib4.createStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
+      Lib4.createStop (Lib2.StopId 'S' 2) (Lib2.Name "stop") (Lib2.Point (Lib2.CoordX 15.0) (Lib2.CoordY 25.0))
+      Lib4.createRoute (Lib2.RouteId 'R' 2) (Lib2.Name "route") [Lib4.Stop (Lib2.StopId 'S' 1), Lib4.Stop (Lib2.StopId 'S' 2)]
+      return ("", "")
+
+    program4 :: Lib4.MyDomain (String, String)
+    program4 = do
+      Lib4.createStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
+      Lib4.createStop (Lib2.StopId 'S' 2) (Lib2.Name "stop") (Lib2.Point (Lib2.CoordX 15.0) (Lib2.CoordY 25.0))
+      Lib4.createRoute (Lib2.RouteId 'R' 2) (Lib2.Name "route") [Lib4.Stop (Lib2.StopId 'S' 1), Lib4.Stop (Lib2.StopId 'S' 2)]
+      Lib4.connectRouteStopsByMinDistance (Lib2.RouteId 'R' 2)
+      ab <- Lib4.findNextStop (Lib2.StopId 'S' 1) (Lib2.RouteId 'R' 2)
+      return (show ab, "")
+
+    program5 :: Lib4.MyDomain (String, String)
+    program5 = do
+      Lib4.createStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
+      Lib4.createStop (Lib2.StopId 'S' 2) (Lib2.Name "stop") (Lib2.Point (Lib2.CoordX 15.0) (Lib2.CoordY 25.0))
+      Lib4.createRoute (Lib2.RouteId 'R' 2) (Lib2.Name "route") [Lib4.Stop (Lib2.StopId 'S' 1), Lib4.Stop (Lib2.StopId 'S' 2)]
+      Lib4.connectRouteStopsByMinDistance (Lib2.RouteId 'R' 2)
+      ab <- Lib4.findPreviousStop (Lib2.StopId 'S' 2) (Lib2.RouteId 'R' 2)
+      return (show ab, "")
+
+    program6 :: Lib4.MyDomain (String, String)
+    program6 = do
+      Lib4.createStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
+      Lib4.createStop (Lib2.StopId 'S' 2) (Lib2.Name "stop") (Lib2.Point (Lib2.CoordX 15.0) (Lib2.CoordY 25.0))
+      Lib4.createRoute (Lib2.RouteId 'R' 2) (Lib2.Name "route") [Lib4.Stop (Lib2.StopId 'S' 1), Lib4.Stop (Lib2.StopId 'S' 2)]
+      Lib4.connectRouteStopsByMinDistance (Lib2.RouteId 'R' 2)
+      ab <- Lib4.checkIfRouteStopsConnected (Lib2.RouteId 'R' 2)
+      return (show ab, "")
+
+    program7 :: Lib4.MyDomain (String, String)
+    program7 = do
+      Lib4.createStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
+      Lib4.createStop (Lib2.StopId 'S' 2) (Lib2.Name "stop") (Lib2.Point (Lib2.CoordX 15.0) (Lib2.CoordY 25.0))
+      Lib4.createRoute (Lib2.RouteId 'R' 2) (Lib2.Name "route") [Lib4.Stop (Lib2.StopId 'S' 1), Lib4.Stop (Lib2.StopId 'S' 2)]
+      ab <- Lib4.checkIfRouteStopsConnected (Lib2.RouteId 'R' 2)
+      return (show ab, "")

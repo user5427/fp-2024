@@ -43,6 +43,10 @@ library:
   - QuickCheck
   - transformers
   - strict
+  - lens
+  - bytestring
+  - wreq
+  - string-conversions
 
 executables:
   fp2024-one:

@@ -40,6 +40,7 @@ library
       Lib1
       Lib2
       Lib3
+      Lib4
   other-modules:
       Paths_fp2024
   autogen-modules:
@@ -51,11 +52,15 @@ library
       QuickCheck
     , async
     , base >=4.7 && <5
+    , bytestring
     , free
+    , lens
     , random
     , stm
     , strict
+    , string-conversions
     , transformers
+    , wreq
   default-language: Haskell2010
 
 executable fp2024-four-client

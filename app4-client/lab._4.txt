@@ -1,0 +1,96 @@
+Lib4.save
+Lib4.createStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
+Lib4.createStop (Lib2.StopId 'S' 2) (Lib2.Name "stop") (Lib2.Point (Lib2.CoordX 15.0) (Lib2.CoordY 25.0))
+Lib4.createRoute (Lib2.RouteId 'R' 2) (Lib2.Name "route") [Lib4.Stop (Lib2.StopId 'S' 1), Lib4.Stop (Lib2.StopId 'S' 2)]
+Lib4.view
+Lib4.connectRouteStopsByMinDistance (Lib2.RouteId 'R' 2)
+Lib4.view
+_ <- Lib4.findNextStop (Lib2.StopId 'S' 1) (Lib2.RouteId 'R' 2)
+_ <- Lib4.findPreviousStop (Lib2.StopId 'S' 2) (Lib2.RouteId 'R' 2)
+_ <- Lib4.checkIfRouteStopsConnected (Lib2.RouteId 'R' 2)
+Lib4.createTrip (Lib2.TripId 'T' 1) (Lib2.Name "trippy") [Lib4.SCNP (Lib4.Stop (Lib2.StopId 'S' 1))]
+_ <- Lib4.validateTrip (Lib4.Trip (Lib2.TripId 'T' 1))
+_ <- Lib4.distanceBetweenStops (Lib2.StopId 'S' 1) (Lib2.StopId 'S' 2)
+
+___IN MEMORY___
+
+Sending command: SAVE
+Sending command: create_stop(S1, StopName, 10.0, 20.0)
+Stop Name "StopName" created
+Sending command: create_stop(S2, stop, 15.0, 25.0)
+Stop Name "stop" created
+Sending command: create_route(R2, route, S1, S2)
+Route Name "route" created
+Sending command: VIEW
+State {stops = [Stop (StopId 'S' 1) (Name "StopName") (Point (CoordX 10.0) (CoordY 20.0)) [] [] [RouteId 'R' 2],Stop (StopId 'S' 2) (Name "stop") (Point (CoordX 15.0) (CoordY 25.0)) [] [] [RouteId 'R' 2]], routes = [Route (RouteId 'R' 2) (Name "route") [StopId 'S' 1,StopId 'S' 2]], paths = [], trips = []}
+Sending command: connect_route_stops_by_min_dist(R2)
+Route stops connected by min distance
+Sending command: VIEW
+State {stops = [Stop (StopId 'S' 1) (Name "StopName") (Point (CoordX 10.0) (CoordY 20.0)) [NextStop (StopId 'S' 2) (RouteId 'R' 2)] [] [RouteId 'R' 2],Stop (StopId 'S' 2) (Name "stop") (Point (CoordX 15.0) (CoordY 25.0)) [] [PreviousStop (StopId 'S' 1) (RouteId 'R' 2)] [RouteId 'R' 2]], routes = [Route (RouteId 'R' 2) (Name "route") [StopId 'S' 1,StopId 'S' 2]], paths = [], trips = []}
+Sending command: find_next_stop(S1, R2)
+Next stop found: StopId 'S' 2
+Sending command: find_previous_stop(S2, R2)
+Previous stop found: StopId 'S' 1
+Sending command: check_if_route_stops_connected(R2)
+Route stops connected: True
+Sending command: create_trip(T1, trippy, S1)
+Trip Name "trippy" created
+Sending command: validate_trip(T1)
+Trip stops connected: True
+Sending command: distance_between_stops(S1, S2)
+Distance between stops is 7.071068
+
+___HTTP interpreter___
+Sending command: SAVE
+Server response: Saved
+Sending command: BEGIN create_stop(S1, StopName, 10.0, 20.0); END
+Server response: Stop Name "StopName" created
+Sending command: BEGIN create_stop(S2, stop, 15.0, 25.0); END
+Server response: Stop Name "stop" created
+Sending command: BEGIN create_route(R2, route, S1, S2); END
+Server response: Route Name "route" created
+Sending command: BEGIN VIEW; END
+Server response: State {stops = [Stop (StopId 'S' 1) (Name "StopName") (Point (CoordX 10.0) (CoordY 20.0)) [] [] [RouteId 'R' 2],Stop (StopId 'S' 2) (Name "stop") (Point (CoordX 15.0) (CoordY 25.0)) [] [] [RouteId 'R' 2]], routes = [Route (RouteId 'R' 2) (Name "route") [StopId 'S' 1,StopId 'S' 2]], paths = [], trips = []}
+Sending command: BEGIN connect_route_stops_by_min_dist(R2); END
+Server response: Route stops connected by min distance
+Sending command: BEGIN VIEW; END
+Server response: State {stops = [Stop (StopId 'S' 1) (Name "StopName") (Point (CoordX 10.0) (CoordY 20.0)) [NextStop (StopId 'S' 2) (RouteId 'R' 2)] [] [RouteId 'R' 2],Stop (StopId 'S' 2) (Name "stop") (Point (CoordX 15.0) (CoordY 25.0)) [] [PreviousStop (StopId 'S' 1) (RouteId 'R' 2)] [RouteId 'R' 2]], routes = [Route (RouteId 'R' 2) (Name "route") [StopId 'S' 1,StopId 'S' 2]], paths = [], trips = []}
+Sending command: BEGIN find_next_stop(S1, R2); END
+Server response: Next stop found: StopId 'S' 2
+Sending command: BEGIN find_previous_stop(S2, R2); END
+Server response: Previous stop found: StopId 'S' 1
+Sending command: BEGIN check_if_route_stops_connected(R2); END
+Server response: Route stops connected: True
+Sending command: BEGIN create_trip(T1, trippy, S1); END
+Server response: Trip Name "trippy" created
+Sending command: BEGIN validate_trip(T1); END
+Server response: Trip stops connected: True
+Sending command: BEGIN distance_between_stops(S1, S2); END
+Server response: Distance between stops is 7.071068
+
+__SMART HTTP interpreter___
+Sending command(s): SAVE
+Server response: Saved
+Sending command(s): BEGIN create_stop(S1, StopName, 10.0, 20.0); create_stop(S2, stop, 15.0, 25.0); create_route(R2, route, S1, S2); END
+Server response: [0] Stop Name "StopName" created
+[1] Stop Name "stop" created
+[2] Route Name "route" created
+
+Sending command(s): VIEW
+Server response: State {stops = [Stop (StopId 'S' 1) (Name "StopName") (Point (CoordX 10.0) (CoordY 20.0)) [] [] [RouteId 'R' 2],Stop (StopId 'S' 2) (Name "stop") (Point (CoordX 15.0) (CoordY 25.0)) [] [] [RouteId 'R' 2]], routes = [Route (RouteId 'R' 2) (Name "route") [StopId 'S' 1,StopId 'S' 2]], paths = [], trips = []}
+Sending command(s): BEGIN connect_route_stops_by_min_dist(R2); END
+Server response: Route stops connected by min distance
+Sending command(s): VIEW
+Server response: State {stops = [Stop (StopId 'S' 1) (Name "StopName") (Point (CoordX 10.0) (CoordY 20.0)) [NextStop (StopId 'S' 2) (RouteId 'R' 2)] [] [RouteId 'R' 2],Stop (StopId 'S' 2) (Name "stop") (Point (CoordX 15.0) (CoordY 25.0)) [] [PreviousStop (StopId 'S' 1) (RouteId 'R' 2)] [RouteId 'R' 2]], routes = [Route (RouteId 'R' 2) (Name "route") [StopId 'S' 1,StopId 'S' 2]], paths = [], trips = []}
+Sending command(s): BEGIN find_next_stop(S1, R2); END
+Server response: Next stop found: StopId 'S' 2
+Sending command(s): BEGIN find_previous_stop(S2, R2); END
+Server response: Previous stop found: StopId 'S' 1
+Sending command(s): BEGIN check_if_route_stops_connected(R2); END
+Server response: Route stops connected: True
+Sending command(s): BEGIN create_trip(T1, trippy, S1); END
+Server response: Trip Name "trippy" created
+Sending command(s): BEGIN validate_trip(T1); END
+Server response: Trip stops connected: True
+Sending command(s): BEGIN distance_between_stops(S1, S2); END
+Server response: Distance between stops is 7.071068
