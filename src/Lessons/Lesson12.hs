@@ -36,9 +36,8 @@ save = liftF $ Save id
 -- In an equation for `it_a18Kv':
 --     it_a18Kv = evalPrint (runWithState program)
 
--- >>> evalStateT (runWithState program)
--- Variable not in scope:
---   evalStateT :: State (Int, String) (String, String) -> t_a15iU[sk:1]
+-- >>> runIOLog program
+-- ("fake state","fake state")
 program :: MyDomain (String, String)
 program = do
     load

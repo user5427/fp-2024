@@ -11,6 +11,8 @@ module Lib2
     stateTransition,
     parseExact,
     parse,
+    parseFloat,
+    parseInteger
     ) where
 
 import qualified Data.Char as C
@@ -21,6 +23,7 @@ import Control.Monad.Trans.Except (ExceptT, throwE, runExceptT)
 import Control.Monad.Trans.Class(lift)
 import Control.Monad.IO.Class(liftIO)
 import Control.Monad.Trans.State.Strict (State, StateT, get, put, runState, runStateT)
+import Lessons.Lesson08 (Parser(Parser))
 
 -- type Parser a = String -> Either String (a, String)
 type Parser2 a = ExceptT String (Control.Monad.Trans.State.Strict.State String) a

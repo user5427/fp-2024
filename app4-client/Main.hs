@@ -1,7 +1,34 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE InstanceSigs #-}
 
-module Main (main) where
+module Main (
+    main,
+    inMemoryInterpreter,
+    createStop,
+    createRoute,
+    createPath,
+    createTrip,
+    joinTwoTrips,
+    joinTwoRoutes,
+    joinTwoRoutesAtStop,
+    cleanupTrip,
+    validateTrip,
+    findNextStop,
+    findPreviousStop,
+    tripDistance,
+    setNextStop,
+    setPreviousStop,
+    connectRouteStopsByMinDistance,
+    checkIfRouteStopsConnected,
+    distanceBetweenStops,
+    assignStopToRoute,
+    view,
+    save,
+    load,
+    MyDomain,
+
+
+) where
 
 import Control.Monad.Free (Free (..), liftF)
 
@@ -10,15 +37,12 @@ import Network.Wreq ( post, responseBody )
 import Data.String.Conversions
 import Control.Lens hiding (view)
 import qualified Lib2
-import qualified Lib3 
-import Data.IORef
-import Lib2 (QueryStopOrCreatOrNextPrev)
-import qualified GHC.Base as Control.Monad
 
 import Control.Monad.Trans.Class (lift)
-import Control.Monad.Trans.State.Strict (State, StateT, get, put, runState, runStateT, evalStateT, modify)
-import Control.Monad (when, unless)
+import Control.Monad.Trans.State.Strict (StateT, get, put, evalStateT)
+import Control.Monad (unless)
 import Data.List (intercalate)
+import Text.Read.Lex (Number)
 
 
 data QSCNP = Stop Lib2.StopId | CreateStop' (MyDomainTransport ()) | FindNextStop' (MyDomainTransport ()) | FindPreviousStop' (MyDomainTransport ())
@@ -34,15 +58,15 @@ data MyDomainTransport next = CreateStop Lib2.StopId Lib2.Name Lib2.Point (() ->
                             | JoinTwoRoutes QRoute QRoute Lib2.RouteId Lib2.Name (() -> next)
                             | JoinTwoRoutesAtStop QRoute QRoute QSCNP Lib2.RouteId Lib2.Name (() -> next)
                             | CleanupTrip QTrip (() -> next)
-                            | ValidateTrip QTrip (() -> next)
-                            | FindNextStop Lib2.StopId Lib2.RouteId (() -> next)
-                            | FindPreviousStop Lib2.StopId Lib2.RouteId (() -> next)
-                            | TripDistance QTrip (() -> next)
+                            | ValidateTrip QTrip (Bool -> next)
+                            | FindNextStop Lib2.StopId Lib2.RouteId (Lib2.StopId -> next)
+                            | FindPreviousStop Lib2.StopId Lib2.RouteId (Lib2.StopId -> next)
+                            | TripDistance QTrip (Float -> next)
                             | SetNextStop Lib2.StopId Lib2.RouteId Lib2.StopId (() -> next)
                             | SetPreviousStop Lib2.StopId Lib2.RouteId Lib2.StopId (() -> next)
                             | ConnectRouteStopsByMinDistance Lib2.RouteId (() -> next)
-                            | CheckIfRouteStopsConnected Lib2.RouteId (() -> next)
-                            | DistanceBetweenStops Lib2.StopId Lib2.StopId (() -> next)
+                            | CheckIfRouteStopsConnected Lib2.RouteId (Bool -> next)
+                            | DistanceBetweenStops Lib2.StopId Lib2.StopId (Float -> next)
                             | AssignStopToRoute Lib2.StopId Lib2.RouteId (() -> next)
                             | View (() -> next)
                             | Save (() -> next)
@@ -75,16 +99,16 @@ joinTwoRoutesAtStop qr1 qr2 qscnp routeId name = liftF $ JoinTwoRoutesAtStop qr1
 cleanupTrip :: QTrip -> MyDomain ()
 cleanupTrip qt = liftF $ CleanupTrip qt id
 
-validateTrip :: QTrip -> MyDomain ()
+validateTrip :: QTrip -> MyDomain Bool
 validateTrip qt = liftF $ ValidateTrip qt id
 
-findNextStop :: Lib2.StopId -> Lib2.RouteId -> MyDomain ()
+findNextStop :: Lib2.StopId -> Lib2.RouteId -> MyDomain Lib2.StopId
 findNextStop stopId routeId = liftF $ FindNextStop stopId routeId id
 
-findPreviousStop :: Lib2.StopId -> Lib2.RouteId -> MyDomain ()
+findPreviousStop :: Lib2.StopId -> Lib2.RouteId -> MyDomain Lib2.StopId
 findPreviousStop stopId routeId = liftF $ FindPreviousStop stopId routeId id
 
-tripDistance :: QTrip -> MyDomain ()
+tripDistance :: QTrip -> MyDomain Float
 tripDistance qt = liftF $ TripDistance qt id
 
 setNextStop :: Lib2.StopId -> Lib2.RouteId -> Lib2.StopId -> MyDomain ()
@@ -96,10 +120,10 @@ setPreviousStop stopId routeId previousStopId = liftF $ SetPreviousStop stopId r
 connectRouteStopsByMinDistance :: Lib2.RouteId -> MyDomain ()
 connectRouteStopsByMinDistance routeId = liftF $ ConnectRouteStopsByMinDistance routeId id
 
-checkIfRouteStopsConnected :: Lib2.RouteId -> MyDomain ()
+checkIfRouteStopsConnected :: Lib2.RouteId -> MyDomain Bool
 checkIfRouteStopsConnected routeId = liftF $ CheckIfRouteStopsConnected routeId id
 
-distanceBetweenStops :: Lib2.StopId -> Lib2.StopId -> MyDomain ()
+distanceBetweenStops :: Lib2.StopId -> Lib2.StopId -> MyDomain Float
 distanceBetweenStops stopId1 stopId2 = liftF $ DistanceBetweenStops stopId1 stopId2 id
 
 assignStopToRoute :: Lib2.StopId -> Lib2.RouteId -> MyDomain ()
@@ -206,7 +230,6 @@ interpretHttp (Free step) = do
                     _ -> "BEGIN " ++ toCommandString a ++ "END"
 
             putStrLn $ "Sending command: " ++ formComString
-
             resp <- post "http://localhost:3000" (cs formComString :: ByteString)
             let serverResponse = cs $ resp ^. responseBody :: String
             putStrLn $ "Server response: " ++ serverResponse
@@ -214,7 +237,83 @@ interpretHttp (Free step) = do
             case a of
                 Save next -> return $ next ()
                 Load next -> return $ next ()
+                TripDistance _ _ -> processTripDistance a serverResponse
+                FindNextStop _ _ _ -> processNextStop a serverResponse
+                FindPreviousStop _ _ _ -> processPreviousStop a serverResponse
+                CheckIfRouteStopsConnected _ _ -> processRouteConnected a serverResponse
+                ValidateTrip _ _ -> processTripStopsConnected a serverResponse
+                DistanceBetweenStops _ _ _ -> processDistanceBetweenStops a serverResponse
                 _ -> return $ extractNext a
+
+processTripDistance :: MyDomainTransport a -> String -> IO a
+processTripDistance (TripDistance _ next) serverResponse = 
+    let
+        distanceStr = drop (length "Trip distance: ") serverResponse
+        (result, remainingState) = Lib2.parse Lib2.parseFloat distanceStr
+    in case result of
+        Left e -> return $ next (-1)
+        Right d -> return $ next d
+processTripDistance _ _ = error "Unsupported command"
+
+-- Process "Next stop found" command
+processNextStop :: MyDomainTransport a -> String -> IO a
+processNextStop (FindNextStop _ _ next) serverResponse =
+    let
+        stopIdStr = drop (length "Next stop found: StopId 'S' ") serverResponse
+        (result, remainingState) = Lib2.parse Lib2.parseInteger stopIdStr
+    in case result of
+        Left e -> return $ next (Lib2.StopId 'S' (-1))
+        Right stopId -> return $ next (Lib2.StopId 'S' (fromInteger stopId))
+processNextStop _ _ = error "Unsupported command"
+
+-- Process "Previous stop found" command
+processPreviousStop :: MyDomainTransport a -> String -> IO a
+processPreviousStop (FindPreviousStop _ _ next) serverResponse =
+    let
+        stopIdStr = drop (length "Previous stop found: StopId 'S' ") serverResponse
+        (result, remainingState) = Lib2.parse Lib2.parseInteger stopIdStr
+    in case result of
+        Left e -> return $ next (Lib2.StopId 'S' (-1))
+        Right stopId -> return $ next (Lib2.StopId 'S' (fromInteger stopId))
+processPreviousStop _ _ = error "Unsupported command"
+
+parseBool :: String -> Either String Bool
+parseBool "True"  = Right True
+parseBool "False" = Right False
+parseBool _       = Left "Invalid boolean value"
+
+-- Process "Trip stops connected" command
+processTripStopsConnected :: MyDomainTransport a -> String -> IO a
+processTripStopsConnected (ValidateTrip _ next) serverResponse =
+    let
+        boolStr = drop (length "Trip stops connected: ") serverResponse
+        result = parseBool boolStr
+    in case result of
+        Left e -> return $ next False
+        Right isConnected -> return $ next isConnected
+processTripStopsConnected _ _ = error "Unsupported command"
+
+-- Process "Distance between stops" command
+processDistanceBetweenStops :: MyDomainTransport a -> String -> IO a
+processDistanceBetweenStops (DistanceBetweenStops _ _ next) serverResponse =
+    let
+        distanceStr = drop (length "Distance between stops is ") serverResponse
+        (result, remainingState) = Lib2.parse Lib2.parseFloat distanceStr
+    in case result of
+        Left e -> return $ next (-1)
+        Right distance -> return $ next distance
+processDistanceBetweenStops _ _ = error "Unsupported command"
+
+-- Process "Route stops connected" command
+processRouteConnected :: MyDomainTransport a -> String -> IO a
+processRouteConnected (CheckIfRouteStopsConnected _ next) serverResponse =
+    let
+        boolStr = drop (length "Route stops connected: ") serverResponse
+        result = parseBool boolStr
+    in case result of
+        Left e -> return $ next False
+        Right isConnected -> return $ next isConnected
+processRouteConnected _ _ = error "Unsupported command"
 
 -- Extract the continuation from the command
 extractNext :: MyDomainTransport a -> a
@@ -226,15 +325,15 @@ extractNext (JoinTwoTrips _ _ _ _ next) = next ()
 extractNext (JoinTwoRoutes _ _ _ _ next) = next ()
 extractNext (JoinTwoRoutesAtStop _ _ _ _ _ next) = next ()
 extractNext (CleanupTrip _ next) = next ()
-extractNext (ValidateTrip _ next) = next ()
-extractNext (FindNextStop _ _ next) = next ()
-extractNext (FindPreviousStop _ _ next) = next ()
-extractNext (TripDistance _ next) = next ()
+extractNext (ValidateTrip _ next) = next False
+extractNext (FindNextStop _ _ next) = next (Lib2.StopId 'S' (-1))
+extractNext (FindPreviousStop _ _ next) = next (Lib2.StopId 'S' (-1))
+extractNext (TripDistance _ next) = next (-1)
 extractNext (SetNextStop _ _ _ next) = next ()
 extractNext (SetPreviousStop _ _ _ next) = next ()
 extractNext (ConnectRouteStopsByMinDistance _ next) = next ()
-extractNext (CheckIfRouteStopsConnected _ next) = next ()
-extractNext (DistanceBetweenStops _ _ next) = next ()
+extractNext (CheckIfRouteStopsConnected _ next) = next False
+extractNext (DistanceBetweenStops _ _ next) = next (-1)
 extractNext (AssignStopToRoute _ _ next) = next ()
 extractNext (View next) = next ()
 extractNext _ = error "Unsupported command"
@@ -257,16 +356,46 @@ smartInterpretHttp a = evalStateT (runProgram a) []
     processCommand cmd = case cmd of
         Save next -> do
             flushBatch
-            lift $ sendCommand "SAVE"
+            _ <- lift $ sendCommand "SAVE"
             return $ next ()
         Load next -> do
             flushBatch
-            lift $ sendCommand "LOAD"
+            _ <- lift $ sendCommand "LOAD"
             return $ next ()
         View next -> do
             flushBatch
-            lift $ sendCommand "VIEW"
+            _ <- lift $ sendCommand "VIEW"
             return $ next ()
+        TripDistance _ _ -> do
+            flushBatch
+            let commandStr = toCommandString cmd
+            response <- lift $ sendCommand commandStr
+            lift $ processTripDistance cmd response
+        FindNextStop _ _ _ -> do
+            flushBatch
+            let commandStr = toCommandString cmd
+            response <- lift $ sendCommand commandStr
+            lift $ processNextStop cmd response
+        FindPreviousStop _ _ _ -> do
+            flushBatch
+            let commandStr = toCommandString cmd
+            response <- lift $ sendCommand commandStr
+            lift $ processPreviousStop cmd response
+        CheckIfRouteStopsConnected _ _ -> do
+            flushBatch
+            let commandStr = toCommandString cmd
+            response <- lift $ sendCommand commandStr
+            lift $ processRouteConnected cmd response
+        DistanceBetweenStops _ _ _ -> do
+            flushBatch
+            let commandStr = toCommandString cmd
+            response <- lift $ sendCommand commandStr
+            lift $ processDistanceBetweenStops cmd response
+        ValidateTrip _ _ -> do
+            flushBatch
+            let commandStr = toCommandString cmd
+            response <- lift $ sendCommand commandStr
+            lift $ processTripStopsConnected cmd response
         -- Batchable commands
         _ -> do
             let commandStr = toCommandString cmd
@@ -286,12 +415,15 @@ smartInterpretHttp a = evalStateT (runProgram a) []
             put []
 
     -- Send a single command to the server
-    sendCommand :: String -> IO ()
+    sendCommand :: String -> IO String
     sendCommand command = do
         putStrLn $ "Sending command(s): " ++ command
         resp <- post "http://localhost:3000" (cs command :: ByteString)
         let serverResponse = cs $ resp ^. responseBody :: String
         putStrLn $ "Server response: " ++ serverResponse
+        return serverResponse
+
+
 
 inMemoryInterpreter :: MyDomain a -> IO a
 inMemoryInterpreter a = evalStateT (runProgram a) Lib2.emptyState
@@ -315,16 +447,33 @@ inMemoryInterpreter a = evalStateT (runProgram a) Lib2.emptyState
             case a of
                 Save next -> return $ next ()
                 Load next -> return $ next ()
+
                 _ -> do
                     case Lib2.parseQuery formComString of
-                        Left e -> lift $ putStrLn $ "PARSE ERROR:" ++ e
+                        Left e -> do
+                            lift $ putStrLn $ "PARSE ERROR:" ++ e
+                            error "PARSE ERROR"
                         Right e -> do
                             st <- get
                             case Lib2.stateTransition st (fst e) of
-                                Left e2 -> lift $ putStrLn $ "ERROR:" ++ e2
-                                Right (m, ns) -> (put ns) >> mapM_ (lift . putStrLn) m
+                                Left e2 -> do 
+                                    lift $ putStrLn $ "ERROR:" ++ e2
+                                    return $ extractNext a
+                                Right (m, ns) -> do
+                                    put ns
+                                    lift $ mapM_ (putStrLn) m
+                                    case m of 
+                                        Just msg -> case a of
+                                            TripDistance _ _ -> lift $ processTripDistance a msg
+                                            FindNextStop _ _ _ -> lift $ processNextStop a msg
+                                            FindPreviousStop _ _ _ -> lift $ processPreviousStop a msg
+                                            CheckIfRouteStopsConnected _ _ -> lift $ processRouteConnected a msg
+                                            ValidateTrip _ _ -> lift $ processTripStopsConnected a msg
+                                            DistanceBetweenStops _ _ _ -> lift $ processDistanceBetweenStops a msg
+                                            _ -> return $ extractNext a
+                                        Nothing -> return $ extractNext a
                                 
-                    return $ extractNext a
+                    
 
 
 -- >>> interpretHttp program
@@ -333,15 +482,22 @@ program :: MyDomain (String, String)
 program = do
     save
     createStop (Lib2.StopId 'S' 1) (Lib2.Name "StopName") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
-    createStop (Lib2.StopId 'S' 2) (Lib2.Name "stop") (Lib2.Point (Lib2.CoordX 10.0) (Lib2.CoordY 20.0))
+    createStop (Lib2.StopId 'S' 2) (Lib2.Name "stop") (Lib2.Point (Lib2.CoordX 15.0) (Lib2.CoordY 25.0))
+    createRoute (Lib2.RouteId 'R' 2) (Lib2.Name "route") [Stop (Lib2.StopId 'S' 1), Stop (Lib2.StopId 'S' 2)]
     view
-    createRoute (Lib2.RouteId 'R' 2) (Lib2.Name "route") [Stop (Lib2.StopId 'S' 1)]
-    createRoute (Lib2.RouteId 'R' 3) (Lib2.Name "routee") [Stop (Lib2.StopId 'S' 2)]
-    createPath (Lib2.PathId 'P' 1) (Lib2.Name "path") (Lib2.PathLenght 10.0) (Lib2.StopId 'S' 1) (Lib2.StopId 'S' 2)
-    createTrip (Lib2.TripId 'T' 1) (Lib2.Name "trippy") [Path (Lib2.PathId 'P' 1)]
+    -- createRoute (Lib2.RouteId 'R' 3) (Lib2.Name "routee") [Stop (Lib2.StopId 'S' 2)]
+    -- createPath (Lib2.PathId 'P' 1) (Lib2.Name "path") (Lib2.PathLenght 10.0) (Lib2.StopId 'S' 1) (Lib2.StopId 'S' 2)
+    -- view
+    -- joinTwoRoutes (Route (Lib2.RouteId 'R' 2)) (Route (Lib2.RouteId 'R' 3)) (Lib2.RouteId 'R' 99) (Lib2.Name "test")
+    -- view
+    connectRouteStopsByMinDistance (Lib2.RouteId 'R' 2)
     view
-    joinTwoRoutes (Route (Lib2.RouteId 'R' 2)) (Route (Lib2.RouteId 'R' 3)) (Lib2.RouteId 'R' 99) (Lib2.Name "test")
-    view
+    _ <- findNextStop (Lib2.StopId 'S' 1) (Lib2.RouteId 'R' 2)
+    _ <- findPreviousStop (Lib2.StopId 'S' 2) (Lib2.RouteId 'R' 2)
+    _ <- checkIfRouteStopsConnected (Lib2.RouteId 'R' 2)
+    createTrip (Lib2.TripId 'T' 1) (Lib2.Name "trippy") [SCNP (Stop (Lib2.StopId 'S' 1))]
+    _ <- validateTrip (Trip (Lib2.TripId 'T' 1))
+    _ <- distanceBetweenStops (Lib2.StopId 'S' 1) (Lib2.StopId 'S' 2)
     return ("", "")
 
 
