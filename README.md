@@ -3,7 +3,7 @@
 
 ## [lab1](lab1.md)
 ## [lab2](lab2.md)
-## [lab2](lab3.md)
+## [lab3](lab3.md)
 
 ## lab 4
 
