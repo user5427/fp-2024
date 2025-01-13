@@ -37,6 +37,8 @@ library
       Lessons.Lesson10
       Lessons.Lesson11
       Lessons.Lesson12
+      Lessons.Lesson14
+      Lessons.Lesson15
       Lib1
       Lib2
       Lib3
@@ -53,6 +55,7 @@ library
     , async
     , base >=4.7 && <5
     , bytestring
+    , deepseq
     , free
     , lens
     , random
